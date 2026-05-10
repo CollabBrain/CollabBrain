@@ -1,0 +1,114 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+  VIEWER
+}
+
+enum DocumentType {
+  PDF
+  DOCX
+  LINK
+  IMAGE
+}
+
+model Account {
+  id           String      @id @default(uuid())
+  username        String      @unique
+  passwordHash String      @map("password_hash")
+  role         AccountRole @default(STAFF)
+  isActive     Boolean     @default(true) @map("is_active")
+  isDeleted    Boolean     @default(false) @map("is_deleted")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  @@map("accounts")
+}
+
+model User {
+  id        String        @id @default(uuid())
+  email     String        @unique
+  passwordHash String     @map("password_hash")
+  name      String
+  avatarUrl String?       @map("avatar_url")
+  bio       String?
+  isActive  Boolean       @default(true) @map("is_active")
+  isDeleted Boolean       @default(false) @map("is_deleted")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  groups    GroupMember[]
+  documents Document[]
+  @@map("users")
+}
+
+model Group {
+  id          String        @id @default(uuid())
+  name        String
+  description String?
+  avatarUrl   String?       @map("avatar_url")
+  isActive    Boolean       @default(true) @map("is_active")
+  isDeleted   Boolean       @default(false) @map("is_deleted")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+  members     GroupMember[]
+  documents   Document[]
+  @@map("groups")
+}
+
+model GroupMember {
+  groupId   String    @map("group_id")
+  userId    String    @map("user_id")
+  role      GroupRole @default(MEMBER)
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  invitedBy String?   @map("invited_by")
+  group     Group     @relation(fields: [groupId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  @@id([groupId, userId])
+  @@map("group_members")
+}
+
+model Document {
+  id         String          @id @default(uuid())
+  name       String
+  type       DocumentType
+  url        String
+  size       Int?
+  isEmbedded Boolean         @default(false) @map("is_embedded")
+  isDeleted  Boolean         @default(false) @map("is_deleted")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  groupId    String          @map("group_id")
+  uploadedBy String          @map("uploaded_by")
+  group      Group           @relation(fields: [groupId], references: [id])
+  uploader   User            @relation(fields: [uploadedBy], references: [id])
+  chunks     DocumentChunk[]
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id         String   @id @default(uuid())
+  content    String
+  chunkIndex Int      @map("chunk_index")
+  documentId String   @map("document_id")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@map("document_chunks")
+}
+model OtpVerification {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  otp       String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("otp_verifications")
+}
