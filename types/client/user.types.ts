@@ -4,3 +4,16 @@ export interface Register{
   password: string,
   name: string
 }
+
+export interface VerifyOTPRegister extends Register{
+  otp: string
+}
+
+export interface VerifyOTP{
+  email: string,
+  otp: string
+}
+
+export interface ResetPassword extends VerifyOTP{
+  password: string
+}

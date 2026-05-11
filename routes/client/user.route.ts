@@ -1,9 +1,16 @@
 import { Router } from "express";
-const router: Router = Router()
 import * as controller from "../../controllers/client/user.controller"
-router.post("/login",controller.loginPost)
+import * as validate from "../../validates/client/user.validate"
 
-router.post("/register", controller.registerPost)
-router.post("/register/verify-otp",controller.verifyOtpRegisterPost)
+const router: Router = Router()
+
+router.post("/login", validate.loginPost, controller.loginPost)
+
+router.post("/register", validate.registerPost, controller.registerPost)
+router.post("/register/verify-otp", validate.verifyOtpRegisterPost, controller.verifyOtpRegisterPost)
+
+router.post("/forgot-password/forgot", validate.forgotPasswordPost, controller.forgotPasswordPost)
+router.post("/forgot-password/otp", validate.verifyOTPPost, controller.verifyOTPPost)
+router.post("/forgot-password/reset", validate.resetPasswordPost, controller.resetPasswordPost)
 
 export const userRoutes = router
