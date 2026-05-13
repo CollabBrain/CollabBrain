@@ -1,15 +1,18 @@
-const { User } = require('../models');
-const bcrypt = require('bcryptjs');
+import { Response } from 'express';
+import { AuthRequest } from '../middlewares/authMiddleware';
+import db from '../models';
+import bcrypt from 'bcryptjs';
+import jwt from 'jsonwebtoken';
+
+const User = db.User;
 
 // Helper function to validate email
-const isValidEmail = (email) => {
+const isValidEmail = (email: string) => {
   const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
   return re.test(email);
 };
 
-const jwt = require('jsonwebtoken');
-
-const register = async (req, res) => {
+export const register = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { username, email, password } = req.body;
     if (!username || !email || !password) return res.status(400).json({ message: 'Vui lòng nhập đủ thông tin' });
@@ -26,13 +29,13 @@ const register = async (req, res) => {
       password: hashedPassword
     });
 
-    res.status(201).json({ message: 'Đăng ký thành công', userId: user.id });
-  } catch (err) {
-    res.status(500).json({ message: 'Lỗi server', error: err.message });
+    return res.status(201).json({ message: 'Đăng ký thành công', userId: user.id });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Lỗi server', error: err.message });
   }
 };
 
-const login = async (req, res) => {
+export const login = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const { email, password } = req.body;
     if (!email || !password) return res.status(400).json({ message: 'Vui lòng nhập đủ thông tin' });
@@ -49,16 +52,16 @@ const login = async (req, res) => {
       }
     };
 
-    jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '1h' }, (err, token) => {
+    jwt.sign(payload, process.env.JWT_SECRET as string, { expiresIn: '1h' }, (err, token) => {
       if (err) throw err;
-      res.json({ message: 'Đăng nhập thành công', token });
+      return res.json({ message: 'Đăng nhập thành công', token });
     });
-  } catch (err) {
-    res.status(500).json({ message: 'Lỗi server', error: err.message });
+  } catch (err: any) {
+    return res.status(500).json({ message: 'Lỗi server', error: err.message });
   }
 };
 
-const updateProfile = async (req, res) => {
+export const updateProfile = async (req: AuthRequest, res: Response): Promise<any> => {
   try {
     const userId = req.user.id;
     const { fullName, email, phone, bio, password, avatar } = req.body;
@@ -114,18 +117,12 @@ const updateProfile = async (req, res) => {
       updatedAt: user.updatedAt
     };
 
-    res.json({
+    return res.json({
       message: 'Cập nhật hồ sơ thành công',
       user: userResponse
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error('Lỗi khi cập nhật profile:', error.message);
-    res.status(500).send('Lỗi máy chủ nội bộ');
+    return res.status(500).send('Lỗi máy chủ nội bộ');
   }
-};
-
-module.exports = {
-  register,
-  login,
-  updateProfile
 };

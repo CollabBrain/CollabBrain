@@ -1,9 +1,11 @@
-require('dotenv').config();
-const express = require('express');
-const bodyParser = require('body-parser');
-const { helmetMiddleware } = require('./middlewares/securityMiddleware');
-const userRoutes = require('./routes/userRoutes');
-const { sequelize } = require('./models');
+import dotenv from 'dotenv';
+dotenv.config();
+
+import express, { Request, Response } from 'express';
+import bodyParser from 'body-parser';
+import { helmetMiddleware } from './middlewares/securityMiddleware';
+import userRoutes from './routes/userRoutes';
+import db from './models';
 
 const app = express();
 
@@ -18,7 +20,7 @@ app.use(bodyParser.urlencoded({ extended: true, limit: '10kb' }));
 app.use('/api/users', userRoutes);
 
 // Basic Route
-app.get('/', (req, res) => {
+app.get('/', (req: Request, res: Response) => {
   res.send('Remote Meeting API - Secure Version');
 });
 
@@ -28,7 +30,7 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
   console.log(`Server is running on port ${PORT}`);
   try {
-    await sequelize.authenticate();
+    await db.sequelize.authenticate();
     console.log('Database connection has been established successfully.');
   } catch (error) {
     console.error('Unable to connect to the database:', error);
