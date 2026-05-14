@@ -1,12 +1,12 @@
 import { Router } from "express";
 import * as controller from "../../controllers/client/user.controller"
 import * as validate from "../../validates/client/user.validate"
-
+import * as rateLimit from "../../middlewares/client/rateLimit.middleware"
 const router: Router = Router()
 
-router.post("/login", validate.loginPost, controller.loginPost)
+router.post("/login",rateLimit.authIpLimiter, validate.loginPost, rateLimit.loginEmailLimiter,controller.loginPost)
 
-router.post("/register", validate.registerPost, controller.registerPost)
+router.post("/register", rateLimit.authIpLimiter, validate.registerPost, rateLimit.registerEmailLimiter,controller.registerPost)
 router.post("/register/verify-otp", validate.verifyOtpRegisterPost, controller.verifyOtpRegisterPost)
 
 router.post("/forgot-password/forgot", validate.forgotPasswordPost, controller.forgotPasswordPost)
