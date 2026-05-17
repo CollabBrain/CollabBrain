@@ -1,7 +1,7 @@
 import bcrypt from "bcrypt"
 import { generateUserAccessToken, generateUserRefreshToken } from "../../helpers/jwt";
-import { createUser, deleteOTP, findAnyUserByEmail, findOTPByEmail, findUserByEmail, resetPasswordUser, saveOTP } from "../../repositories/client/user.repo";
-import { Register, ResetPassword, VerifyOTPRegister } from "../../types/client/user.types";
+import { createUser, deleteOTP, findAnyUserByEmail, findOTPByEmail, findUserByEmail, findUserById, resetPasswordUser, saveOTP, updateDataUser } from "../../repositories/client/user.repo";
+import { Register, VerifyOTP, VerifyOTPRegister, ResetPassword, UserTypes } from "../../types/client/user.types";
 import { generateNumber } from "../../helpers/generate";
 import { sendmail } from "../../helpers/sendmail";
 
@@ -20,6 +20,7 @@ export const loginService = async ({ email, password }: { email: string, passwor
   return { accessToken, refreshToken }
 }
 
+
 export const registerService = async (data: Register) => {
   const isExistUser = await findAnyUserByEmail(data.email);
   if (isExistUser) {
@@ -32,19 +33,19 @@ export const registerService = async (data: Register) => {
 
   const subject = "OTP Xác Thực Đăng Kí";
   const html = `Mã OTP của bạn là <b>${otp}</b>. Mã sẽ hết hạn sau 5 phút`;
-  await sendmail(data.email, subject, html)
+  await sendmail(data.email, subject,html)
 
   return {
     message: "Đã gửi OTP về mail"
   }
 }
-
 export const verifyOTPRegister = async (data: VerifyOTPRegister) => {
-  const isExistUser = await findAnyUserByEmail(data.email);
-  if (isExistUser) {
-    throw new Error("Người dùng đã tồn tại!!!")
+  const isExistUser = await  findAnyUserByEmail(data.email);
+  if(isExistUser){
+    throw new Error(
+      "Người dùng đã tồn tại"
+    )
   }
-
   const record = await findOTPByEmail(data.email);
   if (!record) throw new Error("OTP không tồn tại");
   if (record.otp !== data.otp) throw new Error("OTP không đúng");
@@ -62,59 +63,65 @@ export const verifyOTPRegister = async (data: VerifyOTPRegister) => {
   return { accessToken, refreshToken };
 }
 
-//ForgotPassService
-export const forgotPasswordServiceSendMail = async (email: string) =>{
-  const user = await findUserByEmail(email)
+//ForgotPasswordService
+
+export const forgotPasswordServiceSendMail = async(email: string)=>{
+  const user = await findUserByEmail(email);
   if(!user){
     throw new Error("Không tìm thấy tài khoản")
   }
-  const otp = generateNumber(6);
-  const expiresAt = new Date(Date.now() + 5 * 60 * 1000);
-  await saveOTP({email, otp, expiresAt})
+  const otp = generateNumber(6)
+  const expiresAt = new Date(Date.now() + 5*60*1000)
+  await saveOTP({email,otp,expiresAt})
 
   const subject = "CollabBrain Mã OTP reset mật khẩu"
-  const html = `Mã OTP của bạn là <b>${otp}</b>. Mã có hiệu lực trong 5 phút`
-  await sendmail(email, subject, html);
-
+  const html = ` Mã OTP của bạn là <b>${otp}</b>. Mã có hiệu lực trong 5 phút`
+  await sendmail(email,subject,html)
   return {
     message: "Đã gửi OTP về mail"
   }
 }
 
 const checkOTPForgotPassword = async(email: string, otp: string)=>{
-  const record = await findOTPByEmail(email);
-  if (!record) throw new Error("OTP không tồn tại");
-  if (record.otp !== otp) throw new Error("OTP không đúng");
-  if (record.expiresAt < new Date()) throw new Error("OTP đã hết hạn");
+  const record =await findOTPByEmail(email);
+  if(!record){
+    throw new Error("OTP không tồn tại")
+  }
+  if(record.otp !== otp) throw new Error("OTP không đúng")
+  if(record.expiresAt < new Date()) throw new Error("OTP đã hết hạn");
+  
   return record;
 }
 
-//VerifyOTPPassword
 export const verifyOTPForgotPassword = async(email: string, otp: string)=>{
-  const user = await findUserByEmail(email)
-  if(!user){
-    throw new Error("Không tìm thấy tài khoản")
-  }
-  await checkOTPForgotPassword(email, otp)
-  return {
+  const user = await findUserByEmail(email);
+  if(!user) throw new Error("Không tìm thấy tài khoản")
+ 
+  await checkOTPForgotPassword(email,otp)
+
+  return{
     message: "Xác thực OTP thành công"
   }
 }
 
 //ResetPassword
 const salt = 10
-export const resetPasswordService = async({email, otp, password}: ResetPassword)=>{
+export const resetPasswordService = async ({email,otp, password}:ResetPassword)=>{
   const user = await findUserByEmail(email)
-  if(!user){
-    throw new Error("Không tìm thấy tài khoản")
-  }
-
-  await checkOTPForgotPassword(email, otp)
-  const passwordHash = await bcrypt.hash(password, salt)
-  await resetPasswordUser({email, passwordHash})
+  if(!user) throw new Error("Không tìm thấy tài khoản")
+  
+  await checkOTPForgotPassword(email,otp)
+  const passwordHash = await bcrypt.hash(password,salt)
+  await resetPasswordUser({email,passwordHash})
   await deleteOTP(email)
-
-  return {
+  return{
     message: "Đổi mật khẩu thành công"
   }
+}
+
+
+export const editProfileService = async(id: string, payload: UserTypes)=>{
+  const user = await updateDataUser(id, payload)
+return user
+
 }
