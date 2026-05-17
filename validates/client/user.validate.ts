@@ -1,16 +1,15 @@
 import { NextFunction, Request, Response } from "express";
-
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const isEmpty = (value: any) => {
-  return value === undefined || value === null || String(value).trim() === "";
+  return value === undefined || value === null ||
+    String(value).trim() === ""
 }
-
 const errorResponse = (res: Response, message: string) => {
   res.status(400).json({
     code: 400,
     message
-  });
+  })
 }
 
 const normalizeEmail = (req: Request) => {
@@ -19,59 +18,63 @@ const normalizeEmail = (req: Request) => {
 
 const validateEmail = (req: Request, res: Response) => {
   if (isEmpty(req.body.email)) {
-    errorResponse(res, "Vui lòng nhập email");
-    return false;
+    errorResponse(res, "Vui lòng nhập email")
+    return false
+
   }
-  normalizeEmail(req);
+  normalizeEmail(req)
   if (!emailRegex.test(req.body.email)) {
-    errorResponse(res, "Email không hợp lệ");
-    return false;
+    errorResponse(res, "Email không hợp lệ")
+    return false
   }
   return true;
 }
 
-const validatePassword = (req: Request, res: Response) => {
-  if (isEmpty(req.body.password)) {
-    errorResponse(res, "Vui lòng nhập mật khẩu");
-    return false;
+const validatePassword = (req: Request, res: Response)=>{
+  if(isEmpty(req.body.password)){
+    errorResponse(res, "Vui lòng nhập mật khẩu")
+    return false
   }
-  req.body.password = String(req.body.password);
-  if (req.body.password.length < 6) {
-    errorResponse(res, "Mật khẩu phải có ít nhất 6 ký tự");
-    return false;
+
+  req.body.password = String(req.body.password)
+  if(req.body.password.length < 6){
+    errorResponse(res, "Mật khẩu phải có ít nhất 6 ký tự")
+    return false
   }
-  return true;
+  return true
 }
 
-const validateName = (req: Request, res: Response) => {
-  if (isEmpty(req.body.name)) {
+const validateName = (req: Request, res: Response)=>{
+  if(isEmpty(req.body.name)){
     errorResponse(res, "Vui lòng nhập tên");
-    return false;
+    return false
   }
   req.body.name = String(req.body.name).trim();
-  return true;
+  return true
 }
 
-const validateOTP = (req: Request, res: Response) => {
-  if (isEmpty(req.body.otp)) {
+const validateOTP = (req: Request, res: Response)=>{
+  if(isEmpty(req.body.otp)){
     errorResponse(res, "Vui lòng nhập OTP");
-    return false;
+    return false
   }
+
   req.body.otp = String(req.body.otp).trim();
+
   if (!/^\d{6}$/.test(req.body.otp)) {
     errorResponse(res, "OTP phải gồm 6 chữ số");
     return false;
   }
-  return true;
+  return true
 }
 
-export const loginPost = (req: Request, res: Response, next: NextFunction) => {
-  if (!validateEmail(req, res)) return;
-  if (!validatePassword(req, res)) return;
-  next();
+export const loginPost = (req: Request, res: Response, next: NextFunction)=>{
+  if(!validateEmail(req,res)) return
+  if(!validatePassword(req,res)) return
+  next()
 }
 
-export const registerPost = (req: Request, res: Response, next: NextFunction) => {
+export const registerPost = (req: Request, res: Response, next:NextFunction)=>{
   if (!validateEmail(req, res)) return;
   if (!validatePassword(req, res)) return;
   if (!validateName(req, res)) return;
