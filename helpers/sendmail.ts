@@ -3,26 +3,23 @@ import dotenv from "dotenv"
 
 dotenv.config()
 
-export const sendmail = async (email:string, subject:string, html: string)=>{
-  const user = process.env.EMAIL_USER;
-  const pass = process.env.EMAIL_PASSWORD;
-
-  if (!user || !pass) {
-    throw new Error("Thiếu cấu hình email")
-  }
-
+export const sendmail = async (email: string, subject: string, html: string) => {
   const transporter = nodemailer.createTransport({
-    service: "gmail",
+    service: 'gmail',
     auth: {
-      user,
-      pass
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
     },
   });
 
-  await transporter.sendMail({
-    from: user,
-    to: email,
-    subject: subject,
+
+  const mailOptions = {
+    from: process.env.EMAIL_USER,
+    to: email, 
+    subject: subject, 
     html: html
-  });
+  };
+
+
+  await transporter.sendMail(mailOptions)
 }
