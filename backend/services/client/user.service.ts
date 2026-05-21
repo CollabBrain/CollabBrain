@@ -1,5 +1,5 @@
 import bcrypt from "bcrypt"
-import { generateUserAccessToken, generateUserRefreshToken } from "../../helpers/jwt";
+import { generateUserAccessToken, generateUserRefreshToken, verifyRefreshToken } from "../../helpers/jwt";
 import { createUser, deleteOTP, findAnyUserByEmail, findOTPByEmail, findUserByEmail, findUserById, resetPasswordUser, saveOTP, updateDataUser } from "../../repositories/client/user.repo";
 import { Register, VerifyOTP, VerifyOTPRegister, ResetPassword, UserTypes } from "../../types/client/user.types";
 import { generateNumber } from "../../helpers/generate";
@@ -98,7 +98,7 @@ export const verifyOTPForgotPassword = async(email: string, otp: string)=>{
   if(!user) throw new Error("Không tìm thấy tài khoản")
  
   await checkOTPForgotPassword(email,otp)
-
+  
   return{
     message: "Xác thực OTP thành công"
   }
@@ -114,14 +114,39 @@ export const resetPasswordService = async ({email,otp, password}:ResetPassword)=
   const passwordHash = await bcrypt.hash(password,salt)
   await resetPasswordUser({email,passwordHash})
   await deleteOTP(email)
+
+  // Tạo lại token mới cho user sau khi đổi pass thành công
+  const accessToken = generateUserAccessToken({ id: user.id });
+  const refreshToken = generateUserRefreshToken({ id: user.id });
+
   return{
-    message: "Đổi mật khẩu thành công"
+    message: "Đổi mật khẩu thành công",
+    accessToken,
+    refreshToken
   }
 }
 
 
 export const editProfileService = async(id: string, payload: UserTypes)=>{
-  const user = await updateDataUser(id, payload)
+const user = await updateDataUser(id, payload)
 return user
 
 }
+//Flow:  Verify refresh token   Tìm user  Tạo lại access token
+export const refreshTokenService = async(refreshToken: string)=>{
+  const decoded = verifyRefreshToken(refreshToken)
+  if(typeof decoded === "string" || !decoded.id){
+    throw new Error("Token không hợp lệ")
+  }
+  const user = await findUserById(decoded.id);
+  if(!user){
+    throw new Error("Không tìm thấy tài khoản")
+  }
+
+  const accessToken = generateUserAccessToken({id: user.id})
+  return{
+    accessToken
+  }
+}
+
+
