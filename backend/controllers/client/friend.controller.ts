@@ -1,5 +1,5 @@
 import { Request, Response } from "express"
-import { acceptFriendPostService, blockFriendPatchService, getListFriendService, rejectFriendPostService, requestFriendPostService } from "../../services/client/friend.service"
+import { acceptFriendPostService, blockFriendPatchService, getListFriendService, rejectFriendPostService, requestedListGetService, requestFriendPostService, sentListGetService, unblockFriendPatchService, unfriendDeleteService, unrequestFriendDeleteService } from "../../services/client/friend.service"
 
 export const friendList = async (req: Request, res: Response) => {
   try {
@@ -101,6 +101,91 @@ export const blockFriendPatch = async (req: Request, res: Response) => {
     res.status(400).json({
       code: 400,
       message: `Lỗi: ${error.message}`
+    })
+  }
+}
+
+//[DELETE] /friend/unrequest/:userId
+export const unrequestFriendDelete = async(req: Request, res: Response)=>{
+  try {
+    const myId = (req as any).user.id
+    const targetId = req.params.userId as string
+    const result = await unrequestFriendDeleteService(myId,targetId)
+    res.status(200).json({
+      message: result.message
+    })
+  } catch (error:any) {
+    res.status(400).json({
+      code: 400,
+      message:` Lỗi: ${error.message}`
+    })
+  }
+}
+
+//DELETE /friend/unfriend/:userId
+export const unfriendDelete = async (req: Request, res: Response)=>{
+  try {
+    const myId = (req as any).user.id
+    const targetId = req.params.userId as string
+    const result = await unfriendDeleteService(myId,targetId)
+    res.status(200).json({
+      message: result.message
+    })
+  } catch (error:any) {
+    res.status(400).json({
+      code: 400,
+      message:` Lỗi: ${error.message}`
+    })
+  }
+}
+
+//[GET] /friends/requests/receive
+export const requestedListGet = async(req:Request, res: Response)=>{
+  try {
+    const myId = (req as any).user.id
+    const result = await requestedListGetService(myId)
+    res.status(200).json({
+      data: result.data,
+      message: result.message
+    })
+  } catch (error:any) {
+    res.status(400).json({
+      code: 400,
+      message:` Lỗi: ${error.message}`
+    })
+  }
+}
+//[GET] /friends/requests/sent
+export const sentListGet = async(req: Request, res: Response)=>{
+  try {
+    const myId = (req as any).user.id
+    const result = await sentListGetService(myId)
+    res.status(200).json({
+      data: result.data,
+      message: result.message
+    })
+  } catch (error:any) {
+    res.status(400).json({
+      code: 400,
+      message:` Lỗi: ${error.message}`
+    })
+  }
+}
+
+//[PATCH]  /friends/unblock/:userId
+export const unblockFriendPatch = async(req: Request, res: Response)=>{
+  try {
+    const myId = (req as any).user.id
+    const targetId = req.params.userId as string
+    const result = await unblockFriendPatchService(myId,targetId)
+    res.status(200).json({
+        data: result.data,
+        message: result.message
+      })
+  } catch (error:any) {
+    res.status(400).json({
+      code: 400,
+      message:` Lỗi: ${error.message}`
     })
   }
 }

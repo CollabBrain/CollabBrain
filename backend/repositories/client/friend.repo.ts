@@ -60,3 +60,40 @@ export const createFriendShip = async (senderId: string, receiverId: string)=>{
     
   })
 }
+
+export const getRequestedFriend = async(myId: string)=>{
+  return prisma.friendship.findMany({
+    where:{
+      receiverId: myId,
+      status:"PENDING"
+    },
+    include:{
+      sender:{
+        select:{
+          name: true,
+          avatarUrl: true,
+          email: true
+        }
+      }
+    }
+  })
+}
+
+export const getSentFriend = async(myId: string)=>{
+  return prisma.friendship.findMany({
+    where:{
+      senderId: myId,
+      status: "PENDING"
+    },
+    include:{
+      receiver:{
+        select:{
+          name:true,
+          avatarUrl: true,
+          email: true
+        }
+      }
+      
+    }
+  })
+}
