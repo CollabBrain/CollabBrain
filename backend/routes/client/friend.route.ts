@@ -17,4 +17,5 @@ router.delete("/unfriend/:userId", ratelimit.authIpLimiter,middleware.authMiddle
 router.get("/requests/receive", ratelimit.authIpLimiter,middleware.authMiddleware,controller.requestedListGet)
 router.get("/requests/sent", ratelimit.authIpLimiter, middleware.authMiddleware, controller.sentListGet)
 router.patch("/unblock/:userId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.unblockFriendPatch)
+router.get("/suggestions",ratelimit.authIpLimiter,middleware.authMiddleware,controller.suggestionListGet)
 export const friendRoutes = router

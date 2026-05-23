@@ -1,5 +1,5 @@
 import { FriendshipStatus } from "@prisma/client"
-import { createFriendShip, deleteRowFriendShip, findFriendship, getListFriend, getRequestedFriend, getSentFriend, updateFriendShipStatus } from "../../repositories/client/friend.repo"
+import { createFriendShip, deleteRowFriendShip, findFriendship, getListFriend, getRequestedFriend, getSentFriend, getSuggestFriend, updateFriendShipStatus } from "../../repositories/client/friend.repo"
 
 export const getListFriendService = async (id: string) => {
   const result = await getListFriend(id)
@@ -129,4 +129,12 @@ export const unblockFriendPatchService = async (myId: string, targetId: string) 
 
   const result = await updateFriendShipStatus(friendship.senderId, friendship.receiverId, "ACCEPTED")
   return { data: result, message: "Hủy block thành công" }
+}
+
+export const suggestionListGetService = async (myId: string, limit: number = 10) => {
+  const result = await getSuggestFriend(myId, limit)
+  return {
+    data: result,
+    message: "Lấy danh sách gợi ý thành công"
+  }
 }

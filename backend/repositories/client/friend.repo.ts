@@ -97,3 +97,22 @@ export const getSentFriend = async(myId: string)=>{
     }
   })
 }
+
+export const getSuggestFriend = async (myId: string, limit:number) => {
+  return prisma.$queryRaw`
+    SELECT u.id, u.name, u.email, u.avatar_url AS "avatarUrl", u.bio
+    FROM users u
+    WHERE u.id != ${myId}
+      AND u.is_deleted = false
+      AND u.id NOT IN (
+        SELECT CASE 
+          WHEN f.sender_id = ${myId} THEN f.receiver_id
+          ELSE f.sender_id
+        END
+        FROM friendships f
+        WHERE f.sender_id = ${myId} OR f.receiver_id = ${myId}
+      )
+    ORDER BY RANDOM()
+    LIMIT ${limit}
+  `
+}

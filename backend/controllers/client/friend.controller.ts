@@ -1,5 +1,5 @@
 import { Request, Response } from "express"
-import { acceptFriendPostService, blockFriendPatchService, getListFriendService, rejectFriendPostService, requestedListGetService, requestFriendPostService, sentListGetService, unblockFriendPatchService, unfriendDeleteService, unrequestFriendDeleteService } from "../../services/client/friend.service"
+import { acceptFriendPostService, blockFriendPatchService, getListFriendService, rejectFriendPostService, requestedListGetService, requestFriendPostService, sentListGetService, suggestionListGetService, unblockFriendPatchService, unfriendDeleteService, unrequestFriendDeleteService } from "../../services/client/friend.service"
 
 export const friendList = async (req: Request, res: Response) => {
   try {
@@ -189,3 +189,21 @@ export const unblockFriendPatch = async(req: Request, res: Response)=>{
     })
   }
 }
+//[GET] /friends/suggestions
+export const suggestionListGet = async(req: Request, res: Response)=>{
+  try {
+    const myId = (req as any).user.id
+    const result = await suggestionListGetService(myId,10)
+    res.status(200).json({
+      data: result.data,
+      message: result.message
+    })
+  } catch (error:any) {
+    res.status(400).json({
+      code: 400,
+      message:` Lỗi: ${error.message}`
+    })
+  }
+}
+
+
