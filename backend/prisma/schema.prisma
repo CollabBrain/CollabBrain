@@ -192,7 +192,8 @@ model Message {
   groupId    String?     @map("group_id")     // có = chat group, null = chat 1-1
   isRead     Boolean     @default(false) @map("is_read")
   createdAt  DateTime    @default(now()) @map("created_at")
-
+  deletedBySender   Boolean   @default(false) @map("deleted_by_sender")
+  deletedByReceiver Boolean   @default(false) @map("deleted_by_receiver")
   sender   User   @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
   receiver User?  @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
   group    Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
