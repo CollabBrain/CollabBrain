@@ -4,10 +4,21 @@ import express, { Express } from "express";
 import cors from "cors";
 import clientRoutes from "./routes/client/index.route";
 import adminRoutes from "./routes/admin/index.route";
+import { Server } from "socket.io";
+import http from "http";
+
+import { socketAuthMiddleware } from "./middlewares/client/socket.middleware";
 
 const app: Express = express();
-const PORT = process.env.PORT || 3000;
+const server = http.createServer(app)
 
+const PORT = process.env.PORT || 3000;
+const io = new Server(server, {
+  cors: {
+    origin: process.env.ORIGINAL_URL,
+    credentials: true
+  }
+})
 // ——— CORS
 app.use(
   cors({
@@ -22,13 +33,15 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+app.set("io",io)
 
+io.use(socketAuthMiddleware)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 clientRoutes(app);
 adminRoutes(app);
 
-app.listen(PORT, () => {
-  console.log(`App is listening on port ${PORT}`);
-});
+server.listen(PORT, () => {
+  console.log(`App is listening on ${PORT}`)
+})
