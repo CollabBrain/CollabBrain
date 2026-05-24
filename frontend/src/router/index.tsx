@@ -11,6 +11,7 @@ const RegisterPage = lazy(() => import('../pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/ForgotPasswordPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
+const ChatPage = lazy(() => import('../pages/ChatPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
 // Spinner toàn màn hình khi đang lazy-load
@@ -59,6 +60,7 @@ export const AppRouter = () => {
         >
           <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+          <Route path={ROUTES.CHAT} element={<ChatPage />} />
         </Route>
 
         {/* ——— Redirect root */}
