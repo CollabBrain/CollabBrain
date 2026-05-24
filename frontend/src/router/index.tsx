@@ -14,6 +14,13 @@ const ProfilePage = lazy(() => import('../pages/ProfilePage'));
 const ChatPage = lazy(() => import('../pages/ChatPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 
+// Lazy load friend pages (from feature/friend-ui)
+const FriendsPage = lazy(() => import('../pages/FriendsPage'));
+const FriendRequestsPage = lazy(() => import('../pages/FriendRequestsPage'));
+const SuggestionsPage = lazy(() => import('../pages/SuggestionsPage'));
+const BlockedListPage = lazy(() => import('../pages/BlockedListPage'));
+const UserProfilePage = lazy(() => import('../pages/UserProfilePage'));
+
 // Spinner toàn màn hình khi đang lazy-load
 const PageSpinner = () => (
   <div className="min-h-screen flex items-center justify-center">
@@ -61,6 +68,13 @@ export const AppRouter = () => {
           <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
           <Route path={ROUTES.CHAT} element={<ChatPage />} />
+
+          {/* ——— Friend routes (from feature/friend-ui) */}
+          <Route path="/friends" element={<FriendsPage />} />
+          <Route path="/friends/requests" element={<FriendRequestsPage />} />
+          <Route path="/friends/suggestions" element={<SuggestionsPage />} />
+          <Route path="/friends/blocked" element={<BlockedListPage />} />
+          <Route path="/users/:id" element={<UserProfilePage />} />
         </Route>
 
         {/* ——— Redirect root */}

@@ -3,9 +3,10 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
 @layer base {
   :root {
-    /* Education theme — Indigo/Violet primary */
+    /* Education theme – Indigo/Violet primary */
     --background: 0 0% 99%;
     --foreground: 224 71% 4%;
 
@@ -44,6 +45,7 @@
 
   * {
     @apply border-border;
+    box-sizing: border-box;
   }
 
   body {
@@ -51,6 +53,16 @@
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
     font-feature-settings: "rlig" 1, "calt" 1;
     -webkit-font-smoothing: antialiased;
+    margin: 0;
+  }
+
+  h1, h2, h3, p {
+    margin: 0;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  #root {
+    min-height: 100vh;
   }
 }
 
@@ -87,5 +99,26 @@
   /* Input focus glow */
   .input-glow:focus {
     box-shadow: 0 0 0 3px hsla(243, 75%, 59%, 0.15);
+  }
+
+  /* Button variants */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all duration-200 shadow-sm hover:shadow-md disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer border-0 outline-none;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition-all duration-200 disabled:opacity-50 cursor-pointer border-0 outline-none;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 rounded-lg transition-all duration-200 disabled:opacity-50 cursor-pointer border-0 outline-none;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all duration-200 disabled:opacity-50 cursor-pointer border-0 outline-none;
+  }
+
+  .card {
+    @apply bg-white rounded-xl border border-slate-200 shadow-sm hover:shadow-md transition-all duration-200;
   }
 }
