@@ -1,6 +1,7 @@
 import { MessageType } from "@prisma/client";
 import { findFriendship } from "../../repositories/client/friend.repo";
 import { createMessage, findMessageById, getMessageBetweenUsers, markMessageAsRead, softDelete } from "../../repositories/client/chat.repo";
+import { uploadToSupabase } from "../../helpers/upload";
 
 
 export const sendMessageService = async(senderId: string, receiverId: string, content: string, type: MessageType="TEXT")=>{
@@ -53,5 +54,15 @@ export const deleteMessageService = async(myId: string, messageId: string)=>{
     throw new Error("Bạn không có quyền xóa tin nhắn này")
   return{
     message: "Xóa tin nhắn thành công"
+  }
+}
+
+
+export const uploadToSupabasePostService = async(file: Express.Multer.File, path: string,bucket?:string)=>{
+  if(!file) throw new Error("Không có file")
+  const result = await uploadToSupabase(file,path,bucket)
+  return {
+    data: result,
+    message: "Upload thành công"
   }
 }
