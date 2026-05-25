@@ -8,6 +8,7 @@ import { Server } from "socket.io";
 import http from "http";
 
 import { socketAuthMiddleware } from "./middlewares/client/socket.middleware";
+import { chatSocket } from './sockets/chat.socket';
 
 const app: Express = express();
 const server = http.createServer(app)
@@ -38,7 +39,7 @@ app.set("io",io)
 io.use(socketAuthMiddleware)
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-
+chatSocket(io)
 clientRoutes(app);
 adminRoutes(app);
 

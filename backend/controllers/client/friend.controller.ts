@@ -1,15 +1,24 @@
 import { Request, Response } from "express"
-import { acceptFriendPostService, blockFriendPatchService, getListFriendService, rejectFriendPostService, requestedListGetService, requestFriendPostService, sentListGetService, suggestionListGetService, unblockFriendPatchService, unfriendDeleteService, unrequestFriendDeleteService } from "../../services/client/friend.service"
+import { acceptFriendPostService, blockFriendPatchService, blockedListGetService, getFriendBySearchKeyWord, getListFriendService, rejectFriendPostService, requestedListGetService, requestFriendPostService, sentListGetService, suggestionListGetService, unblockFriendPatchService, unfriendDeleteService, unrequestFriendDeleteService } from "../../services/client/friend.service"
 
 export const friendList = async (req: Request, res: Response) => {
   try {
+    const keyword = req.query.keyword as string;
     const id = (req as any).user.id
-    const result = await getListFriendService(id)
-    res.status(200).json({
-      data: result.data,
-      code: 200,
-      message: result.message
+    if(!keyword){
+      const result = await getListFriendService(id)
+      return res.status(200).json({
+        data: result.data,
+        code: 200,
+        message: result.message
     })
+    }
+    const result = await getFriendBySearchKeyWord(id, keyword)
+    res.status(200).json({
+        data: result.data,
+        code: 200,
+        message: result.message
+      }) 
   } catch (error) {
     res.status(400).json({
       code: 400,
@@ -112,6 +121,7 @@ export const unrequestFriendDelete = async(req: Request, res: Response)=>{
     const targetId = req.params.userId as string
     const result = await unrequestFriendDeleteService(myId,targetId)
     res.status(200).json({
+      code: 200,
       message: result.message
     })
   } catch (error:any) {
@@ -129,6 +139,7 @@ export const unfriendDelete = async (req: Request, res: Response)=>{
     const targetId = req.params.userId as string
     const result = await unfriendDeleteService(myId,targetId)
     res.status(200).json({
+      code: 200,
       message: result.message
     })
   } catch (error:any) {
@@ -145,6 +156,7 @@ export const requestedListGet = async(req:Request, res: Response)=>{
     const myId = (req as any).user.id
     const result = await requestedListGetService(myId)
     res.status(200).json({
+      code: 200,
       data: result.data,
       message: result.message
     })
@@ -161,6 +173,7 @@ export const sentListGet = async(req: Request, res: Response)=>{
     const myId = (req as any).user.id
     const result = await sentListGetService(myId)
     res.status(200).json({
+      code: 200,
       data: result.data,
       message: result.message
     })
@@ -179,6 +192,7 @@ export const unblockFriendPatch = async(req: Request, res: Response)=>{
     const targetId = req.params.userId as string
     const result = await unblockFriendPatchService(myId,targetId)
     res.status(200).json({
+        code: 200,
         data: result.data,
         message: result.message
       })
@@ -195,6 +209,7 @@ export const suggestionListGet = async(req: Request, res: Response)=>{
     const myId = (req as any).user.id
     const result = await suggestionListGetService(myId,10)
     res.status(200).json({
+      code: 200,
       data: result.data,
       message: result.message
     })
@@ -206,4 +221,20 @@ export const suggestionListGet = async(req: Request, res: Response)=>{
   }
 }
 
-
+//[GET] /friends/blocked
+export const blockedListGet = async (req: Request, res: Response)=>{
+  try {
+    const myId = (req as any).user.id
+    const result = await blockedListGetService(myId)
+    res.status(200).json({
+      code: 200,
+      data: result.data,
+      message: result.message
+    })
+  } catch (error:any) {
+    res.status(400).json({
+      code: 400,
+      message:` Lỗi: ${error.message}`
+    })
+  }
+}
