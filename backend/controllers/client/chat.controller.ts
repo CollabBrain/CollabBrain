@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { deleteMessageService, getChatHistoryService, markReadService } from "../../services/client/chat.service";
+import { deleteMessageService, getChatHistoryService, markReadService, uploadToSupabasePostService } from "../../services/client/chat.service";
 //[GET] /chat/history/:userId
 export const getHistory = async (req: Request, res: Response) => {
     try {
@@ -55,6 +55,26 @@ export const deleteMessagePatch = async (req: Request, res: Response)=>{
     res.status(400).json({
       code: 400,
       message: `Lỗi: ${error.message}`
+    })
+  }
+}
+
+//[POST] /chat/upload
+export const uploadFilePost = async(req: Request, res: Response)=>{
+  try {
+    const myId = (req as any).user.id
+    const pathUpload = `chat/${myId}`
+    const result = await uploadToSupabasePostService(req.file!,pathUpload)
+    res.status(200).json({
+      code: 200,
+      data: result.data,
+      message: result.message
+    }
+    )
+  } catch (error) {
+    res.status(400).json({
+      code: 400,
+      message:"Upload thất bại"
     })
   }
 }
