@@ -14,7 +14,7 @@ export const loginPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 5 * 60 * 1000
+      maxAge: 15 * 60 * 1000  // 15 minutes
     })
     res.status(200).json({
       code: 200,
@@ -61,7 +61,7 @@ export const verifyOtpRegisterPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 5 * 60 * 1000
+      maxAge: 15 * 60 * 1000  // 15 minutes
     })
     res.status(200).json({ code: 200, data: result });
   } catch (error: any) {
@@ -121,7 +121,7 @@ export const resetPasswordPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 5 * 60 * 1000
+      maxAge: 15 * 60 * 1000  // 15 minutes
     })
 
     res.status(200).json({
@@ -182,7 +182,7 @@ export const refreshTokenPost = async (req: Request, res: Response) => {
     const result = await refreshTokenService(refreshToken)
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 5 * 60 * 1000
+      maxAge: 15 * 60 * 1000  // 15 minutes
     })
     res.status(200).json({
       code: 200,
