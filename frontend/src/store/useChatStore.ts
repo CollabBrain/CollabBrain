@@ -1,6 +1,10 @@
 import { create } from 'zustand';
 import type { Conversation, Message, ChatUser } from '../types/chat.types';
 
+// Stable empty array references to prevent infinite re-renders
+const EMPTY_MESSAGES: Message[] = [];
+const EMPTY_STRINGS: string[] = [];
+
 interface ChatState {
   // Danh sách cuộc trò chuyện
   conversations: Conversation[];
@@ -43,21 +47,51 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messagePage: {},
   hasMoreMessages: {},
 
-  setConversations: (convs) => set({ conversations: convs }),
+  setConversations: (convs) =>
+    set((state) => {
+      // Merge: giữ lại các conversation đã có trong store mà API không trả về
+      // (ví dụ: conversation vừa tạo optimistic từ FriendsPage)
+      const incomingIds = new Set(convs.map((c) => c.id));
+      const preserved = state.conversations.filter((c) => !incomingIds.has(c.id));
+      const merged = [...convs, ...preserved];
+
+      // Sort theo updatedAt mới nhất
+      merged.sort((a, b) => {
+        const tA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const tB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return (isNaN(tB) ? 0 : tB) - (isNaN(tA) ? 0 : tA);
+      });
+
+      // Avoid unnecessary re-renders: bail out if data hasn't changed
+      if (
+        merged.length === state.conversations.length &&
+        merged.every((c, i) => c.id === state.conversations[i]?.id && c.updatedAt === state.conversations[i]?.updatedAt && c.unreadCount === state.conversations[i]?.unreadCount)
+      ) {
+        return state; // No change — don't trigger re-render
+      }
+
+      return { conversations: merged };
+    }),
 
   addOrUpdateConversation: (conv) =>
     set((state) => {
       const exists = state.conversations.find((c) => c.id === conv.id);
+      let updatedConvs = state.conversations;
       if (exists) {
-        return {
-          conversations: state.conversations
-            .map((c) => (c.id === conv.id ? conv : c))
-            .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
-        };
+        updatedConvs = state.conversations.map((c) => (c.id === conv.id ? conv : c));
+      } else {
+        updatedConvs = [conv, ...state.conversations];
       }
-      return {
-        conversations: [conv, ...state.conversations],
-      };
+      
+      const sorted = [...updatedConvs].sort((a, b) => {
+        const timeA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const timeB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        const finalB = isNaN(timeB) ? 0 : timeB;
+        const finalA = isNaN(timeA) ? 0 : timeA;
+        return finalB - finalA;
+      });
+
+      return { conversations: sorted };
     }),
 
   setActiveConversation: (id) => set({ activeConversationId: id }),
@@ -145,11 +179,11 @@ export const selectActiveConversation = (state: ChatState): Conversation | undef
 };
 
 export const selectActiveMessages = (state: ChatState): Message[] => {
-  if (!state.activeConversationId) return [];
-  return state.messagesByConversation[state.activeConversationId] || [];
+  if (!state.activeConversationId) return EMPTY_MESSAGES;
+  return state.messagesByConversation[state.activeConversationId] || EMPTY_MESSAGES;
 };
 
 export const selectTypingInActive = (state: ChatState): string[] => {
-  if (!state.activeConversationId) return [];
-  return state.typingUsers[state.activeConversationId] || [];
+  if (!state.activeConversationId) return EMPTY_STRINGS;
+  return state.typingUsers[state.activeConversationId] || EMPTY_STRINGS;
 };

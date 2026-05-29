@@ -8,7 +8,8 @@ export const getListFriend = async (id: string) => {
       u.name,
       u.email,
       u.avatar_url AS "avatarUrl",
-      u.bio
+      u.bio,
+      u.created_at AS "createdAt"
     FROM friendships f
     JOIN users u 
       ON u.id = CASE 
