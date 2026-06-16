@@ -21,6 +21,20 @@ const onTokenRefreshed = (token: string) => {
   refreshSubscribers = [];
 };
 
+/**
+ * Gọi logout đúng cách: xóa cả localStorage lẫn Zustand persist,
+ * sau đó redirect qua React Router thay vì window.location (gây reload loop).
+ */
+const forceLogout = () => {
+  // Xóa token trong localStorage
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  // Xóa Zustand persist storage để isAuthenticated = false
+  localStorage.removeItem('auth-storage');
+  // Soft redirect — dùng location chỉ 1 lần, khi Zustand đã clean
+  window.location.replace('/login');
+};
+
 // Request: tự động đính kèm accessToken vào header
 axiosInstance.interceptors.request.use(
   (config) => {
@@ -69,9 +83,7 @@ axiosInstance.interceptors.response.use(
         return axiosInstance(originalRequest);
       } catch (refreshError) {
         isRefreshing = false;
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(REFRESH_TOKEN_KEY);
-        window.location.href = '/login';
+        forceLogout();
         return Promise.reject(refreshError);
       }
     }

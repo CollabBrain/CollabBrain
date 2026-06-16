@@ -1,4 +1,5 @@
 import axios from "axios";
+import { TOKEN_KEY, REFRESH_TOKEN_KEY } from "../constants";
 
 // Using environment variable or default to localhost
 const baseURL = import.meta.env.VITE_API_URL || "http://localhost:3000/api/v1";
@@ -13,13 +14,9 @@ const axiosInstance = axios.create({
 // Request interceptor for adding the bearer token
 axiosInstance.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("token"); // Assuming token is saved in localStorage
+    const token = localStorage.getItem(TOKEN_KEY);
     if (token) {
-      if (config.headers) {
-        config.headers.Authorization = `Bearer ${token}`;
-      } else {
-        (config.headers as any) = { Authorization: `Bearer ${token}` };
-      }
+      config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
@@ -37,11 +34,11 @@ axiosInstance.interceptors.response.use(
   },
   (error) => {
     if (error.response) {
-      // Handle common status codes like 401 Unauthorized
+      // Handle 401: clean up ALL auth state including Zustand persist
       if (error.response.status === 401) {
-        // e.g., redirect to login or clear token
-        localStorage.removeItem("token");
-        // window.location.href = '/login'; // Optional: Redirect
+        localStorage.removeItem(TOKEN_KEY);
+        localStorage.removeItem(REFRESH_TOKEN_KEY);
+        localStorage.removeItem("auth-storage");
       }
     }
     return Promise.reject(error.response?.data || error.message);

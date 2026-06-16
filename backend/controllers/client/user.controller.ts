@@ -1,6 +1,7 @@
 import { Request, Response } from "express";
 import { editProfileService, forgotPasswordServiceSendMail, loginService, refreshTokenService, registerService, resetPasswordService, verifyOTPForgotPassword, verifyOTPRegister } from "../../services/client/user.service";
 import { cookieConfig } from "../../config/cookie";
+import prisma from "../../config/prisma";
 
 //[POSt] /user/login
 export const loginPost = async (req: Request, res: Response) => {
@@ -14,7 +15,7 @@ export const loginPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 15 * 60 * 1000
+      maxAge: 15 * 60 * 1000  // 15 minutes
     })
     res.status(200).json({
       code: 200,
@@ -61,7 +62,7 @@ export const verifyOtpRegisterPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 15 * 60 * 1000
+      maxAge: 15 * 60 * 1000  // 15 minutes
     })
     res.status(200).json({ code: 200, data: result });
   } catch (error: any) {
@@ -121,7 +122,7 @@ export const resetPasswordPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 15 * 60 * 1000
+      maxAge: 15 * 60 * 1000  // 15 minutes
     })
 
     res.status(200).json({
@@ -182,7 +183,7 @@ export const refreshTokenPost = async (req: Request, res: Response) => {
     const result = await refreshTokenService(refreshToken)
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 15 * 60 * 1000
+      maxAge: 15 * 60 * 1000  // 15 minutes
     })
     res.status(200).json({
       code: 200,
@@ -190,8 +191,8 @@ export const refreshTokenPost = async (req: Request, res: Response) => {
       message: "Refresh token thành công"
     })
   } catch (error: any) {
-    res.clearCookie('accessToken', cookieConfig)
-    res.clearCookie('refreshToken', cookieConfig)
+    res.clearCookie('accessToken')
+    res.clearCookie('refreshToken')
     return res.status(400).json({
       code: 400,
       message: error.message || "Phiên đăng nhập hết hạn"
@@ -201,10 +202,10 @@ export const refreshTokenPost = async (req: Request, res: Response) => {
 
 
 //[POST] /user/logout
-export const logoutPost = async (req: Request, res: Response) => {
+export const logoutPost = async (req: Request, res: Response)=>{
   try {
     res.clearCookie('accessToken', cookieConfig);
-
+    
     res.clearCookie('refreshToken', cookieConfig);
     res.status(200).json({
       code: 200,
@@ -217,3 +218,63 @@ export const logoutPost = async (req: Request, res: Response) => {
     })
   }
 }
+
+//[GET] /user/profile/:id — Xem profile người khác
+export const userProfileById = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const user = await prisma.user.findFirst({
+      where: { id, isDeleted: false, isActive: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        avatarUrl: true,
+        bio: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(404).json({
+        code: 404,
+        message: "Không tìm thấy người dùng",
+      });
+    }
+
+    const currentUser = (req as any).user;
+    let friendshipStatus: string | null = null;
+    let isSender = false;
+
+    if (currentUser && currentUser.id !== user.id) {
+      const friendship = await prisma.friendship.findFirst({
+        where: {
+          OR: [
+            { senderId: currentUser.id, receiverId: user.id },
+            { senderId: user.id, receiverId: currentUser.id },
+          ],
+        },
+      });
+
+      if (friendship) {
+        friendshipStatus = friendship.status;
+        isSender = friendship.senderId === currentUser.id;
+      }
+    }
+
+    res.status(200).json({
+      code: 200,
+      data: {
+        ...user,
+        friendshipStatus,
+        isSender,
+      },
+      message: "Lấy thông tin profile thành công",
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      code: 400,
+      message: error.message,
+    });
+  }
+};

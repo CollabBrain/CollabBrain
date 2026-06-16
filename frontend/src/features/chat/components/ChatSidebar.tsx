@@ -1,9 +1,12 @@
 import { useState } from 'react';
-import { Search, Plus, MessageSquare, Loader2 } from 'lucide-react';
+import { Search, Plus, MessageSquare, Loader2, Sparkles } from 'lucide-react';
 import { useChatStore } from '../../../store/useChatStore';
 import { cn } from '../../../lib/utils';
 import type { Conversation, ChatUser } from '../../../types/chat.types';
 import UserSearchModal from './UserSearchModal';
+
+// Stable empty array reference to prevent re-render loops
+const EMPTY_STRINGS: string[] = [];
 
 interface ChatSidebarProps {
   isLoading?: boolean;
@@ -11,11 +14,15 @@ interface ChatSidebarProps {
 }
 
 // ——— helpers ———
-const getOtherParticipant = (conv: Conversation, currentUserId: string): ChatUser | null =>
-  conv.participants.find((p) => p.id !== currentUserId) ?? null;
+const getOtherParticipant = (conv: Conversation, currentUserId: string): ChatUser | null => {
+  if (!conv || !Array.isArray(conv.participants)) return null;
+  return conv.participants.find((p) => p && p.id !== currentUserId) ?? null;
+};
 
-const formatTime = (dateStr: string): string => {
+const formatTime = (dateStr: string | null | undefined): string => {
+  if (!dateStr) return '';
   const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return '';
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffDays = Math.floor(diffMs / 86_400_000);
@@ -30,19 +37,20 @@ const formatTime = (dateStr: string): string => {
 
 // ——— Avatar ———
 const ConvAvatar = ({ user, isOnline }: { user: ChatUser; isOnline: boolean }) => {
-  const initials = user.name
+  const initials = (user.name || '')
     .split(' ')
+    .filter(Boolean)
     .map((w) => w[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || '?';
 
   return (
     <div className="relative shrink-0">
       {user.avatarUrl ? (
         <img
           src={user.avatarUrl}
-          alt={user.name}
+          alt={user.name || 'User'}
           className="h-12 w-12 rounded-full object-cover"
         />
       ) : (
@@ -71,7 +79,7 @@ const ConversationItem = ({
 }) => {
   const other = getOtherParticipant(conv, currentUserId);
   const onlineUsers = useChatStore((s) => s.onlineUsers);
-  const typingUsers = useChatStore((s) => s.typingUsers[conv.id] ?? []);
+  const typingUsers = useChatStore((s) => s.typingUsers[conv.id] ?? EMPTY_STRINGS);
 
   if (!other) return null;
 
@@ -182,6 +190,38 @@ const ChatSidebar = ({ isLoading, currentUserId }: ChatSidebarProps) => {
 
         {/* List */}
         <div className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+          {/* AI Assistant Row */}
+          <button
+            onClick={() => setActiveConversation('ai-assistant')}
+            className={cn(
+              'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left transition-all duration-150 mb-1 border-0 outline-none cursor-pointer',
+              activeConversationId === 'ai-assistant'
+                ? 'bg-indigo-50/70 border border-indigo-100/50 text-indigo-700 shadow-sm font-bold'
+                : 'hover:bg-slate-50 border border-transparent'
+            )}
+          >
+            <div className="relative shrink-0">
+              <div className="h-12 w-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <Sparkles className="h-5 w-5 text-indigo-600" />
+              </div>
+              <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full bg-emerald-500 ring-2 ring-white" />
+            </div>
+
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center justify-between mb-0.5">
+                <span className={cn('font-bold text-sm truncate text-slate-800', activeConversationId === 'ai-assistant' && 'text-indigo-600')}>
+                  AI Assistant
+                </span>
+                <span className="text-[10px] text-indigo-500 font-semibold shrink-0 ml-1">
+                  Active
+                </span>
+              </div>
+              <p className="text-xs text-slate-400 font-semibold truncate">
+                Ready to help you study
+              </p>
+            </div>
+          </button>
+
           {isLoading && (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

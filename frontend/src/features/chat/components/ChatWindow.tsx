@@ -32,19 +32,28 @@ import MessageBubble, { TypingIndicator, DateDivider } from './MessageBubble';
 import { cn } from '../../../lib/utils';
 import type { Conversation, ChatUser, Message } from '../../../types/chat.types';
 
+// Stable empty array reference to prevent re-render loops
+const EMPTY_STRINGS: string[] = [];
+
 interface ChatWindowProps {
   conversation: Conversation;
   currentUserId: string;
   onBackMobile?: () => void;
 }
 
-const shouldShowDate = (prevDate: string | null, currDate: string): boolean => {
+const shouldShowDate = (prevDate: string | null | undefined, currDate: string | null | undefined): boolean => {
+  if (!currDate) return false;
   if (!prevDate) return true;
-  return new Date(prevDate).toDateString() !== new Date(currDate).toDateString();
+  const d1 = new Date(prevDate);
+  const d2 = new Date(currDate);
+  if (isNaN(d1.getTime()) || isNaN(d2.getTime())) return false;
+  return d1.toDateString() !== d2.toDateString();
 };
 
-const getOtherParticipant = (conv: Conversation, userId: string): ChatUser | null =>
-  conv.participants.find((p) => p.id !== userId) ?? null;
+const getOtherParticipant = (conv: Conversation, userId: string): ChatUser | null => {
+  if (!conv || !Array.isArray(conv.participants)) return null;
+  return conv.participants.find((p) => p && p.id !== userId) ?? null;
+};
 
 // ——— Message Context Menu ———
 interface ContextMenu {
@@ -64,12 +73,13 @@ const ChatHeader = ({
   isOnline: boolean;
   onBack?: () => void;
 }) => {
-  const initials = other.name
+  const initials = (other.name || '')
     .split(' ')
+    .filter(Boolean)
     .map((w) => w[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || '?';
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card shrink-0">
@@ -85,7 +95,7 @@ const ChatHeader = ({
 
       <div className="relative shrink-0">
         {other.avatarUrl ? (
-          <img src={other.avatarUrl} alt={other.name} className="h-9 w-9 rounded-full object-cover" />
+          <img src={other.avatarUrl} alt={other.name || 'User'} className="h-9 w-9 rounded-full object-cover" />
         ) : (
           <div className="h-9 w-9 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-semibold text-xs">
             {initials}
@@ -97,7 +107,7 @@ const ChatHeader = ({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm truncate">{other.name}</p>
+        <p className="font-semibold text-sm truncate">{other.name || 'User'}</p>
         <p className="text-xs text-muted-foreground">
           {isOnline
             ? <span className="text-emerald-600 font-medium">Đang hoạt động</span>
@@ -148,7 +158,7 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
 
   // Store
   const messages = useChatStore(selectActiveMessages);
-  const typingUserIds = useChatStore((s) => s.typingUsers[conversation.id] ?? []);
+  const typingUserIds = useChatStore((s) => s.typingUsers[conversation.id] ?? EMPTY_STRINGS);
   const onlineUsers = useChatStore((s) => s.onlineUsers);
   const hasMore = useChatStore((s) => s.hasMoreMessages[conversation.id] ?? true);
 
@@ -171,7 +181,10 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   }, []);
 
   // Đánh dấu đã đọc khi mở
+  const markedRef = useRef<string>('');
   useEffect(() => {
+    if (conversation.id === markedRef.current) return;
+    markedRef.current = conversation.id;
     if (conversation.unreadCount > 0) {
       markRead.mutate(conversation.id);
     }

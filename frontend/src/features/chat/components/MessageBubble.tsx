@@ -11,21 +11,26 @@ interface MessageBubbleProps {
   isLastInGroup?: boolean;
 }
 
-const formatTime = (dateStr: string) =>
-  new Date(dateStr).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+const formatTime = (dateStr: string | null | undefined) => {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+};
 
 const Avatar = ({ user }: { user: ChatUser }) => {
-  const initials = user.name
+  const initials = (user.name || '')
     .split(' ')
+    .filter(Boolean)
     .map((w) => w[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || '?';
 
   return user.avatarUrl ? (
     <img
       src={user.avatarUrl}
-      alt={user.name}
+      alt={user.name || 'User'}
       className="h-7 w-7 rounded-full object-cover shrink-0"
     />
   ) : (
@@ -125,15 +130,22 @@ export const TypingIndicator = ({ senderName }: { senderName?: string }) => (
 // ——— Date Divider ———
 export const DateDivider = ({ dateStr }: { dateStr: string }) => {
   const date = new Date(dateStr);
+  if (isNaN(date.getTime())) return null;
   const now = new Date();
   const diffDays = Math.floor(
     (now.setHours(0, 0, 0, 0) - date.setHours(0, 0, 0, 0)) / 86_400_000
   );
 
   let label: string;
-  if (diffDays === 0) label = 'Hôm nay';
-  else if (diffDays === 1) label = 'Hôm qua';
-  else label = new Date(dateStr).toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' });
+  if (isNaN(diffDays)) {
+    label = 'Ngày khác';
+  } else if (diffDays === 0) {
+    label = 'Hôm nay';
+  } else if (diffDays === 1) {
+    label = 'Hôm qua';
+  } else {
+    label = date.toLocaleDateString('vi-VN', { weekday: 'long', day: 'numeric', month: 'long' });
+  }
 
   return (
     <div className="flex items-center gap-3 my-3">

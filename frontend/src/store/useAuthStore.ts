@@ -40,3 +40,22 @@ export const useAuthStore = create<AuthState>()(
     }
   )
 );
+
+/**
+ * Hook React đáng tin cậy để kiểm tra Zustand persist đã hydrate xong chưa.
+ * Dùng API chính thức `persist.hasHydrated()` + `persist.onFinishHydration()`.
+ */
+import { useState, useEffect } from 'react';
+
+export const useHasHydrated = () => {
+  const [hasHydrated, setHasHydrated] = useState(useAuthStore.persist.hasHydrated());
+
+  useEffect(() => {
+    const unsub = useAuthStore.persist.onFinishHydration(() => {
+      setHasHydrated(true);
+    });
+    return unsub;
+  }, []);
+
+  return hasHydrated;
+};
