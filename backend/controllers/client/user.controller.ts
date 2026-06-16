@@ -277,4 +277,4 @@ export const userProfileById = async (req: Request, res: Response) => {
       message: error.message,
     });
   }
-};
+};
