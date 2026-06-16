@@ -1,47 +1,53 @@
 import {Server, Socket} from "socket.io"
-import { sendMessageService } from "../services/client/chat.service"
-export const chatSocket = (io: Server)=>{
+import { createMessage } from "../repositories/client/chat.repo"
+
+export const chatSocket = (io: Server) => {
   const onlineUsers = new Map<string, string>()
-  io.on("connection",(socket: Socket)=>{
+
+  io.on("connection", (socket: Socket) => {
     const user = socket.data.user
-    
+
     socket.join(user.id)
+    onlineUsers.set(user.id, socket.id)
 
-    onlineUsers.set(user.id,socket.id)
-    socket.emit("online_users",Array.from(onlineUsers.keys()))
-    socket.broadcast.emit("user_online",{userId: user.id})
+    // Thông báo user online cho tất cả
+    socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: true })
 
-
-    socket.on("send_message", async(data)=>{
+    // ——— Gửi tin nhắn ———
+    socket.on("chat:send_message", async (data) => {
       try {
-        const {receiverId, content, type="TEXT"} = data
-  
-        const savedMessage = await sendMessageService(user.id,receiverId,content,type)
-  
-        io.to(receiverId).emit("new_message",savedMessage)
-      } catch (error:any) {
-        socket.emit("message_error",error.message)
+        const { conversationId, content, type = "text" } = data
+        // conversationId = receiverId trong hệ thống này
+        const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any)
+
+        const formattedMessage = {
+          ...savedMessage,
+          conversationId,
+          type: savedMessage.type.toLowerCase()
+        }
+
+        // Gửi cho người nhận
+        io.to(conversationId).emit("chat:new_message", { message: formattedMessage })
+        // Gửi lại cho người gửi để xác nhận
+        socket.emit("chat:new_message", { message: formattedMessage })
+      } catch (error: any) {
+        socket.emit("chat:error", { message: error.message })
       }
-    
-    
     })
 
-    socket.on("typing_start",({toUserId}:{toUserId:string})=>{
-      io.to(toUserId).emit("user_typing",{fromUserId: user.id})
+    // ——— Đang nhập ———
+    socket.on("chat:typing", ({ conversationId, isTyping }: { conversationId: string; isTyping: boolean }) => {
+      io.to(conversationId).emit("chat:typing", {
+        conversationId,
+        userId: user.id,
+        isTyping
+      })
     })
 
-    socket.on("typing_stop",({toUserId}:{toUserId: string})=>{
-      io.to(toUserId).emit("user_stop_typing",{fromUserId: user.id})
-    })
-
-    socket.on("mark_read",({fromUserId}:{fromUserId: string})=>{
-      io.to(fromUserId).emit("messages_read",{byUserId: user.id})
-    })
-
-    socket.on("disconnect",()=>{
+    // ——— Ngắt kết nối ———
+    socket.on("disconnect", () => {
       onlineUsers.delete(user.id)
-      socket.broadcast.emit("user_offline",{userId: user.id})
+      socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: false })
     })
   })
-
 }

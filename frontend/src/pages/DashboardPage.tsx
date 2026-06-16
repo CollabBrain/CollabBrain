@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { APP_NAME, ROUTES } from '../constants';
 
 const DashboardPage = () => {
-  const { isAuthenticated } = useAuthStore();
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
 
   return (
     <div className="space-y-6">

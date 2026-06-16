@@ -1,9 +1,9 @@
 import { useState } from "react"
-import { Button } from "./components/ui/Button"
-import { Input } from "./components/ui/Input"
-import { Label } from "./components/ui/Label"
+import { Button } from "./components/ui/button"
+import { Input } from "./components/ui/input"
+import { Label } from "./components/ui/label"
 import { Avatar } from "./components/ui/Avatar"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/Card"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "./components/ui/card"
 import { Camera, Mail, MapPin, Phone, Briefcase, Shield, Edit2 } from "lucide-react"
 
 export default function Profile() {

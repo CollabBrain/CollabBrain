@@ -1,8 +1,7 @@
 import { io, Socket } from 'socket.io-client';
-import { API_BASE_URL } from '../constants';
 
-// Lấy base URL (bỏ /api)
-const SOCKET_URL = API_BASE_URL.replace('/api', '');
+// URL socket: chỉ cần host + port, không cần path /user
+const SOCKET_URL = (import.meta.env.VITE_SOCKET_URL || 'http://localhost:3000');
 
 let socket: Socket | null = null;
 
@@ -12,9 +11,15 @@ let socket: Socket | null = null;
 export const initSocket = (token: string): Socket => {
   if (socket?.connected) return socket;
 
+  // Nếu đã có socket nhưng chưa kết nối, hủy để tạo mới
+  if (socket) {
+    socket.disconnect();
+    socket = null;
+  }
+
   socket = io(SOCKET_URL, {
     auth: { token },
-    transports: ['websocket'],
+    transports: ['websocket', 'polling'],
     reconnection: true,
     reconnectionAttempts: 5,
     reconnectionDelay: 1000,

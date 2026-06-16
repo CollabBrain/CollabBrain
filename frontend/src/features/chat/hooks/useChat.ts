@@ -1,7 +1,6 @@
 import {
   useQuery,
   useMutation,
-  useQueryClient,
   useInfiniteQuery,
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
@@ -41,18 +40,24 @@ export const useConversations = () => {
   return useQuery({
     queryKey: CHAT_KEYS.conversations,
     queryFn: async () => {
-      const res = await getConversationsApi();
-      const convs = res.data.data?.conversations ?? [];
-      setConversations(convs);
-      return convs;
+      try {
+        const res = await getConversationsApi();
+        const convs = res.data.data?.conversations ?? [];
+        setConversations(convs);
+        return convs;
+      } catch (err) {
+        // Don't wipe the store on network/rate-limit errors
+        console.warn('[useConversations] fetch failed, keeping existing store:', err);
+        return [];
+      }
     },
     staleTime: 30_000,
+    retry: false,
   });
 };
 
 /** Tạo hoặc lấy conversation 1-1 */
 export const useCreateConversation = () => {
-  const queryClient = useQueryClient();
   const addOrUpdate = useChatStore((s) => s.addOrUpdateConversation);
   const setActive = useChatStore((s) => s.setActiveConversation);
 
@@ -62,7 +67,8 @@ export const useCreateConversation = () => {
       const conv = data.data!;
       addOrUpdate(conv);
       setActive(conv.id);
-      queryClient.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+      // Note: Do NOT invalidateQueries here — addOrUpdate already updates the store.
+      // Invalidation causes a refetch loop when navigating to ChatPage.
     },
   });
 };
@@ -90,17 +96,20 @@ export const useInfiniteMessages = (conversationId: string | null) => {
     queryFn: async ({ pageParam }) => {
       if (!conversationId) return { messages: [], page: 1, hasMore: false, total: 0 };
       const res = await getMessagesApi(conversationId, pageParam as number, MESSAGE_PAGE_SIZE);
-      const result = res.data.data!;
+      const result = res.data?.data ?? { messages: [], page: 1, hasMore: false, total: 0 };
+
+      const msgs = result.messages ?? [];
+      const hasMore = !!result.hasMore;
 
       if (pageParam === 1) {
         // Lần đầu: set toàn bộ (messages server trả về đã sort cũ→mới)
-        setMessages(conversationId, result.messages);
+        setMessages(conversationId, msgs);
       } else {
         // Load thêm: prepend vào đầu danh sách (messages cũ hơn)
-        prependMessages(conversationId, result.messages);
+        prependMessages(conversationId, msgs);
       }
-      setHasMore(conversationId, result.hasMore);
-      return result;
+      setHasMore(conversationId, hasMore);
+      return { ...result, messages: msgs, hasMore };
     },
     staleTime: 0,
   });
@@ -111,7 +120,6 @@ export const useInfiniteMessages = (conversationId: string | null) => {
 export const useSendMessage = () => {
   const addMessage = useChatStore((s) => s.addMessage);
   const addOrUpdate = useChatStore((s) => s.addOrUpdateConversation);
-  const conversations = useChatStore((s) => s.conversations);
 
   return useMutation({
     mutationFn: (payload: SendMessagePayload) => sendMessageApi(payload),
@@ -148,8 +156,8 @@ export const useSendMessage = () => {
           },
         };
       });
-      // Cập nhật lastMessage cho conversation
-      const conv = conversations.find((c) => c.id === realMsg.conversationId);
+      // Cập nhật lastMessage cho conversation (use getState to avoid subscription)
+      const conv = useChatStore.getState().conversations.find((c) => c.id === realMsg.conversationId);
       if (conv) addOrUpdate({ ...conv, lastMessage: realMsg, updatedAt: realMsg.createdAt });
     },
 
@@ -166,6 +174,7 @@ export const useSendMessage = () => {
     },
   });
 };
+
 
 // ========== Mark As Read ==========
 
@@ -315,31 +324,20 @@ export const useEmitTyping = () => {
 };
 
 export const useEmitMessage = () => {
-  const addMessage = useChatStore((s) => s.addMessage);
   const accessToken = useAuthStore((s) => s.accessToken);
 
   return useCallback(
-    (payload: SendMessagePayload, currentUserId: string): boolean => {
+    (payload: SendMessagePayload, _currentUserId: string): boolean => {
       if (!accessToken) return false;
       const socket = getSocket();
       if (!socket?.connected) return false;
 
-      // Optimistic add
-      const optimisticMsg: Message = {
-        id: `optimistic-${Date.now()}`,
-        conversationId: payload.conversationId,
-        senderId: currentUserId,
-        content: payload.content,
-        type: payload.type ?? 'text',
-        isRead: false,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-      };
-      addMessage(optimisticMsg);
-
+      // Just emit — server will broadcast chat:new_message back to sender,
+      // which will be handled by the socket handler in ChatPage.
+      // No optimistic add here to avoid duplicate messages.
       socket.emit('chat:send_message', payload);
       return true;
     },
-    [accessToken, addMessage]
+    [accessToken]
   );
 };
