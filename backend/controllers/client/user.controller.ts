@@ -14,7 +14,7 @@ export const loginPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 15 * 60 * 1000  // 15 minutes
+      maxAge: 15 * 60 * 1000
     })
     res.status(200).json({
       code: 200,
@@ -61,7 +61,7 @@ export const verifyOtpRegisterPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 15 * 60 * 1000  // 15 minutes
+      maxAge: 15 * 60 * 1000
     })
     res.status(200).json({ code: 200, data: result });
   } catch (error: any) {
@@ -121,7 +121,7 @@ export const resetPasswordPost = async (req: Request, res: Response) => {
     })
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 15 * 60 * 1000  // 15 minutes
+      maxAge: 15 * 60 * 1000
     })
 
     res.status(200).json({
@@ -182,7 +182,7 @@ export const refreshTokenPost = async (req: Request, res: Response) => {
     const result = await refreshTokenService(refreshToken)
     res.cookie("accessToken", result.accessToken, {
       ...cookieConfig,
-      maxAge: 15 * 60 * 1000  // 15 minutes
+      maxAge: 15 * 60 * 1000
     })
     res.status(200).json({
       code: 200,
@@ -190,8 +190,8 @@ export const refreshTokenPost = async (req: Request, res: Response) => {
       message: "Refresh token thành công"
     })
   } catch (error: any) {
-    res.clearCookie('accessToken')
-    res.clearCookie('refreshToken')
+    res.clearCookie('accessToken', cookieConfig)
+    res.clearCookie('refreshToken', cookieConfig)
     return res.status(400).json({
       code: 400,
       message: error.message || "Phiên đăng nhập hết hạn"
@@ -201,10 +201,10 @@ export const refreshTokenPost = async (req: Request, res: Response) => {
 
 
 //[POST] /user/logout
-export const logoutPost = async (req: Request, res: Response)=>{
+export const logoutPost = async (req: Request, res: Response) => {
   try {
     res.clearCookie('accessToken', cookieConfig);
-    
+
     res.clearCookie('refreshToken', cookieConfig);
     res.status(200).json({
       code: 200,
