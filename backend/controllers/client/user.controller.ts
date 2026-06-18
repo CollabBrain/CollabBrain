@@ -7,7 +7,6 @@ import prisma from "../../config/prisma";
 export const loginPost = async (req: Request, res: Response) => {
   try {
     const { email, password } = req.body;
-
     const result = await loginService({ email, password })
     res.cookie("refreshToken", result.refreshToken, {
       ...cookieConfig,
@@ -27,7 +26,6 @@ export const loginPost = async (req: Request, res: Response) => {
       message: error.message
     })
   }
-
 }
 
 

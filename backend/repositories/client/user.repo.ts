@@ -14,8 +14,15 @@ export const userPublicSelect = {
 }
 
 export const findUserByEmail = async (email: string) => {
-  return prisma.user.findFirst({ where: { email: email, isDeleted: false, isActive: true } })
+  return prisma.user.findFirst({
+    where: {
+      email: email,
+      isDeleted: false,
+      isActive: true
+    }
+  })
 }
+
 export const findUserById = async (id: string) => {
   return prisma.user.findFirst({
     where: {
@@ -26,6 +33,7 @@ export const findUserById = async (id: string) => {
     select: userPublicSelect
   })
 }
+
 export const findAnyUserByEmail = async (email: string) => {
   return prisma.user.findUnique({
     where: {
@@ -42,9 +50,9 @@ export const createUser = async (data: {
 }
 export const saveOTP = ({ email, otp, expiresAt }: { email: string, otp: string, expiresAt: Date }) => {
   return prisma.otpVerification.upsert({
-    where:{email},
-    update:{otp, expiresAt},
-    create:{email, otp, expiresAt}
+    where: { email },
+    update: { otp, expiresAt },
+    create: { email, otp, expiresAt }
   })
 
 }
@@ -56,18 +64,18 @@ export const deleteOTP = (email: string) => {
   return prisma.otpVerification.delete({ where: { email } })
 }
 
-export const resetPasswordUser = async ({email, passwordHash}:{email: string, passwordHash: string})=>{
+export const resetPasswordUser = async ({ email, passwordHash }: { email: string, passwordHash: string }) => {
   return prisma.user.update({
-    where:{
+    where: {
       email: email
     },
-    data:{
+    data: {
       passwordHash: passwordHash
     }
   })
 }
 
-export const updateDataUser = async (id: string,data: UserTypes)=>{
+export const updateDataUser = async (id: string, data: UserTypes) => {
   return prisma.user.update({
     where: {
       id: id

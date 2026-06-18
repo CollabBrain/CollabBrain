@@ -15,5 +15,5 @@ app.use("/chat", chatRoutes)
 app.use("/user/chat", chatRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
 app.use("/upload", uploadRoutes)
 app.use("/user/upload", uploadRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
-
+}
 export default clientRoutes;

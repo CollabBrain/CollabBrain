@@ -5,6 +5,7 @@ export interface Register{
   name: string
 }
 
+
 export interface VerifyOTPRegister extends Register{
   otp: string
 }

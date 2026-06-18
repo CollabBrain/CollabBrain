@@ -8,14 +8,24 @@ interface UserTokenPayload extends JwtPayload {
 }
 
 const getToken = (req: Request) => {
+  const cookieToken = req.cookies?.accessToken
+
+  if (cookieToken) {
+    return cookieToken
+  }
+
   const authorization = req.headers.authorization
+
   if (!authorization) {
     return ""
   }
-  const [type, token] = authorization.split(" ");
+
+  const [type, token] = authorization.split(" ")
+
   if (type !== "Bearer" || !token) {
     return ""
   }
+
   return token
 }
 
