@@ -9,3 +9,12 @@ export const findAccountByUsername = async (username: string)=>{
     }
   })
 }
+
+export const findAccountById = async (id: string) => {
+  return prisma.account.findFirst({
+    where: {
+      id,
+      isDeleted: false
+    }
+  });
+};
