@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import axiosInstance from '../services/axiosInstance';
-import { UserPlus, UserCheck, UserX, Clock, Check, X, MessageCircle, Ban, ArrowLeft, Loader2 } from 'lucide-react';
+import { UserPlus, UserCheck, UserX, Clock, Check, X, MessageCircle, Ban, ArrowLeft, Loader2, Flag } from 'lucide-react';
 import { 
   useSendRequest, 
   useBlockUser, 
@@ -35,6 +35,36 @@ export const UserProfilePage: React.FC = () => {
     },
     enabled: !!id,
   });
+
+  const [isReportOpen, setIsReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('Spam hoặc quảng cáo');
+  const [reportDetail, setReportDetail] = useState('');
+  const [isSubmittingReport, setIsSubmittingReport] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+
+  const handleSendReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!id) return;
+    
+    setIsSubmittingReport(true);
+    try {
+      await axiosInstance.post('/reports', {
+        targetUserId: id,
+        reason: `${reportReason}. Chi tiết: ${reportDetail.trim()}`,
+      });
+      setReportSuccess(true);
+      setReportDetail('');
+      setTimeout(() => {
+        setIsReportOpen(false);
+        setReportSuccess(false);
+      }, 2000);
+    } catch (err) {
+      console.error("Lỗi khi gửi báo cáo:", err);
+      alert("Gửi báo cáo thất bại. Vui lòng thử lại.");
+    } finally {
+      setIsSubmittingReport(false);
+    }
+  };
 
   const handleStartChat = async () => {
     if (!id) return;
@@ -211,6 +241,15 @@ export const UserProfilePage: React.FC = () => {
               >
                 <Ban size={15} />
               </button>
+
+              {/* Report Button */}
+              <button
+                onClick={() => setIsReportOpen(true)}
+                className="btn-secondary !px-3 text-amber-600 border-amber-200 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                title="Báo cáo vi phạm"
+              >
+                <Flag size={15} />
+              </button>
             </div>
           </div>
 
@@ -230,6 +269,99 @@ export const UserProfilePage: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Report Modal */}
+      {isReportOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl w-full max-w-md shadow-2xl p-6 relative animate-in zoom-in-95 duration-250">
+            {reportSuccess ? (
+              <div className="flex flex-col items-center justify-center py-6 text-center space-y-4">
+                <div className="h-16 w-16 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shadow-inner">
+                  <Check size={32} className="animate-bounce" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-slate-900 dark:text-white">Báo cáo thành công!</h3>
+                  <p className="text-sm text-slate-500 dark:text-slate-400">
+                    Cảm ơn bạn đã báo cáo. Quản trị viên sẽ xem xét hành vi của người dùng này.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <form onSubmit={handleSendReport} className="space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-800">
+                  <div className="flex items-center gap-2">
+                    <Flag className="h-5 w-5 text-amber-500" />
+                    <h3 className="text-lg font-bold text-slate-950 dark:text-white">Báo cáo vi phạm</h3>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsReportOpen(false)}
+                    className="p-1.5 rounded-full hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors border-0 bg-transparent cursor-pointer"
+                  >
+                    <X size={18} />
+                  </button>
+                </div>
+
+                <div className="space-y-3 text-left">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                      Lý do vi phạm
+                    </label>
+                    <select
+                      value={reportReason}
+                      onChange={(e) => setReportReason(e.target.value)}
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 font-medium"
+                    >
+                      <option value="Spam hoặc quảng cáo">Spam hoặc quảng cáo</option>
+                      <option value="Xúc phạm, quấy rối hoặc đe dọa">Xúc phạm, quấy rối hoặc đe dọa</option>
+                      <option value="Thông tin sai lệch hoặc lừa đảo">Thông tin sai lệch hoặc lừa đảo</option>
+                      <option value="Nội dung phản cảm, đồi trụy hoặc bạo lực">Nội dung phản cảm, đồi trụy hoặc bạo lực</option>
+                      <option value="Khác">Lý do khác...</option>
+                    </select>
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+                      Chi tiết hành vi vi phạm (Tùy chọn)
+                    </label>
+                    <textarea
+                      value={reportDetail}
+                      onChange={(e) => setReportDetail(e.target.value)}
+                      placeholder="Cung cấp thêm ngữ cảnh hoặc nội dung tin nhắn vi phạm..."
+                      rows={3}
+                      className="w-full rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-3.5 py-2.5 text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 leading-relaxed resize-none"
+                    />
+                  </div>
+                </div>
+
+                <div className="flex gap-3 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsReportOpen(false)}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold border border-slate-200 dark:border-slate-800 bg-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl cursor-pointer transition-colors"
+                  >
+                    Hủy bỏ
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingReport}
+                    className="flex-1 px-4 py-2.5 text-sm font-semibold border-0 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-xl cursor-pointer shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-1.5"
+                  >
+                    {isSubmittingReport ? (
+                      <>
+                        <Loader2 size={16} className="animate-spin" />
+                        Đang gửi...
+                      </>
+                    ) : (
+                      'Gửi báo cáo'
+                    )}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -101,11 +101,18 @@ const ChatPage = () => {
       const convs = useChatStore.getState().conversations;
       const conv = convs.find((c) => c.id === message.conversationId);
       if (conv) {
+        let myId = '';
+        try {
+          const payload = JSON.parse(atob(accessToken.split('.')[1]));
+          myId = payload.id ?? payload.sub ?? payload.userId ?? '';
+        } catch {}
+
+        const isFromMe = message.senderId === myId;
         useChatStore.getState().addOrUpdateConversation({
           ...conv,
           lastMessage: message,
           updatedAt: message.createdAt,
-          unreadCount: conv.unreadCount + 1,
+          unreadCount: isFromMe ? conv.unreadCount : conv.unreadCount + 1,
         });
       }
     };

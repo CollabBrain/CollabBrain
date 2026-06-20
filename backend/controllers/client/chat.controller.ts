@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { deleteMessageService, getChatHistoryService, markReadService, uploadToSupabasePostService } from "../../services/client/chat.service";
+import { deleteMessageService, getChatHistoryService, markReadService, uploadToSupabasePostService, recallMessageService } from "../../services/client/chat.service";
 import prisma from "../../config/prisma";
 import { getListFriend } from "../../repositories/client/friend.repo";
 import { getMessageBetweenUsers, markMessageAsRead } from "../../repositories/client/chat.repo";
@@ -459,6 +459,64 @@ export const sendMessage = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     return res.status(400).json({
+      code: 400,
+      message: `Lỗi: ${error.message}`
+    });
+  }
+};
+
+//[DELETE] /chat/messages/:messageId — Thu hồi/xóa tin nhắn
+export const deleteMessage = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const messageId = req.params.messageId as string;
+    const type = req.query.type as string; // 'recall' or 'delete'
+
+    if (type === "recall") {
+      const result = await recallMessageService(myId, messageId);
+
+      const io = req.app.get("io");
+      if (io) {
+        const targetId = result.data.receiverId || result.data.groupId;
+        if (targetId) {
+          io.to(targetId).emit("chat:message_recalled", {
+            messageId,
+            conversationId: result.data.senderId === myId ? result.data.receiverId : result.data.senderId
+          });
+        }
+      }
+
+      return res.status(200).json({
+        code: 200,
+        message: result.message,
+        data: {
+          ...result.data,
+          conversationId: result.data.senderId === myId ? result.data.receiverId : result.data.senderId,
+          type: result.data.type.toLowerCase() as any
+        }
+      });
+    } else {
+      const message = await prisma.message.findFirst({ where: { id: messageId } });
+      const result = await deleteMessageService(myId, messageId);
+      
+      const io = req.app.get("io");
+      if (io && message) {
+        const targetId = message.senderId === myId ? message.receiverId : message.senderId;
+        if (targetId) {
+          io.to(targetId).emit("chat:message_deleted", {
+            messageId,
+            conversationId: targetId
+          });
+        }
+      }
+
+      return res.status(200).json({
+        code: 200,
+        message: result.message
+      });
+    }
+  } catch (error: any) {
+    res.status(400).json({
       code: 400,
       message: `Lỗi: ${error.message}`
     });

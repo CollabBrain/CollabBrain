@@ -6,6 +6,7 @@ export const userPublicSelect = {
   email: true,
   name: true,
   avatarUrl: true,
+  coverUrl: true,
   bio: true,
   isActive: true,
   isDeleted: true,

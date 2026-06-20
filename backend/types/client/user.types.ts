@@ -21,5 +21,6 @@ export interface ResetPassword extends VerifyOTP{
 export interface UserTypes {
   name?: string,
   avatarUrl?: string,
+  coverUrl?: string,
   bio?: string
 }

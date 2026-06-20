@@ -48,9 +48,13 @@ export const useAuthStore = create<AuthState>()(
 import { useState, useEffect } from 'react';
 
 export const useHasHydrated = () => {
-  const [hasHydrated, setHasHydrated] = useState(useAuthStore.persist.hasHydrated());
+  const [hasHydrated, setHasHydrated] = useState(false);
 
   useEffect(() => {
+    if (useAuthStore.persist.hasHydrated()) {
+      setHasHydrated(true);
+      return;
+    }
     const unsub = useAuthStore.persist.onFinishHydration(() => {
       setHasHydrated(true);
     });
