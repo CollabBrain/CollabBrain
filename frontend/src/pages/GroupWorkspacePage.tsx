@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useFriends } from '../hooks/useFriends';
 import {
   ArrowLeft, MessageSquare, Users, Settings, LogOut, Crown, MoreHorizontal,
   UserPlus, Search, Eye, Trash2, Globe, Lock, UserCheck,
@@ -110,8 +111,8 @@ const MembersTab = ({
   const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const filtered = members.filter(m =>
-    m.name.toLowerCase().includes(search.toLowerCase()) ||
-    m.email.toLowerCase().includes(search.toLowerCase())
+    (m.user?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (m.user?.email || '').toLowerCase().includes(search.toLowerCase())
   );
   const owners = filtered.filter(m => m.role === 'OWNER');
   const others = filtered.filter(m => m.role !== 'OWNER');
@@ -168,35 +169,35 @@ const MembersTab = ({
   };
 
   const MemberRow = ({ member }: { member: MemberData }) => (
-    <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-indigo-50/30 transition-colors group relative">
-      <AvatarCircle name={member.name} avatarUrl={member.avatarUrl} />
+    <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-indigo-50/30 transition-colors group relative last:rounded-b-2xl">
+      <AvatarCircle name={member.user?.name || 'Unknown'} avatarUrl={member.user?.avatarUrl} />
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <p className="text-sm font-semibold text-slate-800">{member.name}</p>
+          <p className="text-sm font-semibold text-slate-800">{member.user?.name || 'Unknown User'}</p>
           <RoleBadge role={member.role} />
         </div>
-        <p className="text-xs text-slate-400 truncate mt-0.5">{member.email}</p>
+        <p className="text-xs text-slate-400 truncate mt-0.5">{member.user?.email || ''}</p>
       </div>
       <div className="flex items-center gap-3 shrink-0">
         {isOwner && member.role !== 'OWNER' && (
           <div className="relative">
             <button
-              onClick={() => setOpenDropdown(openDropdown === member.id ? null : member.id)}
+              onClick={() => setOpenDropdown(openDropdown === member.userId ? null : member.userId)}
               className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg border-0 bg-transparent cursor-pointer opacity-0 group-hover:opacity-100 transition-all"
             >
-              {actionLoading?.startsWith(`kick-${member.id}`) || actionLoading?.startsWith(`role-${member.id}`)
+              {actionLoading?.startsWith(`kick-${member.userId}`) || actionLoading?.startsWith(`role-${member.userId}`)
                 ? <Loader2 className="w-4 h-4 animate-spin" />
                 : <MoreHorizontal className="w-4 h-4" />
               }
             </button>
-            {openDropdown === member.id && (
+            {openDropdown === member.userId && (
               <>
                 <div className="fixed inset-0 z-20" onClick={() => setOpenDropdown(null)} />
                 <div className="absolute right-0 top-9 z-30 w-44 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
                   <div className="p-2 space-y-0.5">
                     <p className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Đổi vai trò</p>
                     {(['MEMBER', 'VIEWER'] as GroupRole[]).map(role => (
-                      <button key={role} onClick={() => handleRoleChange(member.id, role)}
+                      <button key={role} onClick={() => handleRoleChange(member.userId, role)}
                         className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl border-0 cursor-pointer transition-all text-left ${member.role === role ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50'}`}>
                         {role === 'MEMBER' ? <UserCheck className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
                         {role === 'MEMBER' ? 'Thành viên' : 'Chỉ xem'}
@@ -204,7 +205,7 @@ const MembersTab = ({
                       </button>
                     ))}
                     <div className="border-t border-slate-100 mt-1 pt-1">
-                      <button onClick={() => handleKick(member.id)}
+                      <button onClick={() => handleKick(member.userId)}
                         className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl border-0 cursor-pointer transition-all">
                         <LogOut className="w-3.5 h-3.5" />
                         Mời ra khỏi nhóm
@@ -240,13 +241,11 @@ const MembersTab = ({
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="flex gap-3">
         {[
           { label: 'Tổng thành viên', value: group.memberCount, icon: Users, color: 'text-indigo-600 bg-indigo-50' },
-          { label: 'Thành viên', value: members.filter(m => m.role === 'MEMBER').length, icon: CheckCircle, color: 'text-emerald-600 bg-emerald-50' },
-          { label: 'Chủ nhóm', value: members.filter(m => m.role === 'OWNER').length, icon: Crown, color: 'text-amber-600 bg-amber-50' },
         ].map(({ label, value, icon: Icon, color }) => (
-          <div key={label} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3">
+          <div key={label} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3 flex-1 max-w-[250px]">
             <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center`}>
               <Icon className="w-4 h-4" />
             </div>
@@ -265,28 +264,28 @@ const MembersTab = ({
           <p className="text-sm text-slate-400">Đang tải danh sách thành viên...</p>
         </div>
       ) : (
-        <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+        <div className="bg-white border border-slate-100 rounded-2xl">
           {owners.length > 0 && (
             <div>
-              <div className="px-5 py-2.5 bg-amber-50/60 border-b border-amber-100">
+              <div className="px-5 py-2.5 bg-amber-50/60 border-b border-amber-100 rounded-t-2xl">
                 <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
                   <Crown className="w-3 h-3" /> Chủ nhóm
                 </p>
               </div>
               <div className="divide-y divide-slate-50">
-                {owners.map(m => <MemberRow key={m.id} member={m} />)}
+                {owners.map(m => <MemberRow key={m.userId} member={m} />)}
               </div>
             </div>
           )}
           {others.length > 0 && (
             <div>
-              <div className="px-5 py-2.5 bg-slate-50/60 border-y border-slate-100">
+              <div className={`px-5 py-2.5 bg-slate-50/60 border-y border-slate-100 ${owners.length === 0 ? 'rounded-t-2xl' : ''}`}>
                 <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
                   <Users className="w-3 h-3" /> Thành viên · {others.length}
                 </p>
               </div>
               <div className="divide-y divide-slate-50">
-                {others.map(m => <MemberRow key={m.id} member={m} />)}
+                {others.map(m => <MemberRow key={m.userId} member={m} />)}
               </div>
             </div>
           )}
@@ -347,17 +346,19 @@ const MembersTab = ({
 };
 
 // ——— Tab: Documents
-const DocumentsTab = () => (
+const DocumentsTab = ({ isMember, canContribute }: { isMember: boolean; canContribute: boolean }) => (
   <div className="space-y-5">
     <div className="flex items-center justify-between">
       <div>
         <h2 className="text-base font-bold text-slate-800">Tài liệu học tập</h2>
         <p className="text-xs text-slate-400 mt-0.5">Chia sẻ tài liệu, bài tập và ghi chú với nhóm</p>
       </div>
-      <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border-0 cursor-pointer transition-all shadow-md shadow-indigo-200">
-        <Upload className="w-4 h-4" />
-        Tải lên
-      </button>
+      {canContribute && (
+        <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border-0 cursor-pointer transition-all shadow-md shadow-indigo-200">
+          <Upload className="w-4 h-4" />
+          Tải lên
+        </button>
+      )}
     </div>
 
     {/* Quick categories */}
@@ -375,13 +376,15 @@ const DocumentsTab = () => (
       ))}
     </div>
 
-    <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center hover:border-indigo-300 transition-all cursor-pointer group">
-      <div className="w-14 h-14 rounded-2xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center mx-auto mb-4 transition-all">
-        <Upload className="w-7 h-7 text-indigo-400" />
+    {canContribute && (
+      <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center hover:border-indigo-300 transition-all cursor-pointer group">
+        <div className="w-14 h-14 rounded-2xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center mx-auto mb-4 transition-all">
+          <Upload className="w-7 h-7 text-indigo-400" />
+        </div>
+        <p className="text-sm font-semibold text-slate-600">Kéo thả file vào đây hoặc nhấn để chọn</p>
+        <p className="text-xs text-slate-400 mt-2">Hỗ trợ PDF, Word, PowerPoint, ảnh (tối đa 50MB)</p>
       </div>
-      <p className="text-sm font-semibold text-slate-600">Kéo thả file vào đây hoặc nhấn để chọn</p>
-      <p className="text-xs text-slate-400 mt-2">Hỗ trợ PDF, Word, PowerPoint, ảnh (tối đa 50MB)</p>
-    </div>
+    )}
   </div>
 );
 
@@ -400,6 +403,7 @@ const SettingsTab = ({
     name: group.name,
     description: group.description || '',
     visibility: group.visibility,
+    avatarUrl: group.avatarUrl,
   });
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
@@ -557,7 +561,7 @@ const SettingsTab = ({
 };
 
 // ——— Chat Placeholder
-const ChatTab = ({ group }: { group: GroupWithRole }) => (
+const ChatTab = ({ group, canContribute }: { group: GroupWithRole, canContribute: boolean }) => (
   <div className="flex flex-col bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ minHeight: 480 }}>
     <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3 bg-white">
       <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
@@ -569,19 +573,35 @@ const ChatTab = ({ group }: { group: GroupWithRole }) => (
       </div>
     </div>
     <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 py-16">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
-        <MessageSquare className="w-8 h-8 text-indigo-400" />
-      </div>
-      <div>
-        <p className="text-base font-bold text-slate-700">Chat nhóm đang được phát triển</p>
-        <p className="text-sm text-slate-400 max-w-sm leading-relaxed mt-1.5">
-          Tính năng chat nhóm realtime sẽ sớm ra mắt. Theo dõi cập nhật nhé!
-        </p>
-      </div>
-      <span className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-xl">
-        <Bell className="w-3.5 h-3.5" />
-        Sắp có mặt
-      </span>
+      {canContribute ? (
+        <>
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+            <MessageSquare className="w-8 h-8 text-indigo-400" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-slate-700">Chat nhóm đang được phát triển</p>
+            <p className="text-sm text-slate-400 max-w-sm leading-relaxed mt-1.5">
+              Tính năng chat nhóm realtime sẽ sớm ra mắt. Theo dõi cập nhật nhé!
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-xl">
+            <Bell className="w-3.5 h-3.5" />
+            Sắp có mặt
+          </span>
+        </>
+      ) : (
+        <>
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center">
+            <Eye className="w-8 h-8 text-slate-400" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-slate-700">Bạn đang ở chế độ Chỉ xem</p>
+            <p className="text-sm text-slate-400 max-w-sm leading-relaxed mt-1.5">
+              Bạn có thể đọc tin nhắn nhưng không thể nhắn tin vào nhóm này.
+            </p>
+          </div>
+        </>
+      )}
     </div>
   </div>
 );
@@ -608,10 +628,11 @@ const GroupWorkspacePage = () => {
   // ——— UI state
   const [showLeaveModal, setShowLeaveModal] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
-  const [inviteUserId, setInviteUserId] = useState('');
-  const [inviteLoading, setInviteLoading] = useState(false);
+  const [inviteLoadingId, setInviteLoadingId] = useState<string | null>(null);
+  const [invitedIds, setInvitedIds] = useState<string[]>([]);
   const [inviteError, setInviteError] = useState('');
-  const [inviteSuccess, setInviteSuccess] = useState(false);
+
+  const { data: friendsList, isLoading: friendsLoading } = useFriends();
 
   const [leaveLoading, setLeaveLoading] = useState(false);
   const [joinLoading, setJoinLoading] = useState(false);
@@ -625,9 +646,10 @@ const GroupWorkspacePage = () => {
 
   const isOwner = membershipStatus === 'OWNER';
   const isMember = ['OWNER', 'MEMBER', 'VIEWER'].includes(membershipStatus);
+  const canContribute = ['OWNER', 'MEMBER'].includes(membershipStatus);
 
-  const tabs: { id: ActiveTab; label: string; icon: React.ElementType; ownerOnly?: boolean }[] = [
-    { id: 'chat', label: 'Chat', icon: MessageSquare },
+  const tabs: { id: ActiveTab; label: string; icon: React.ElementType; ownerOnly?: boolean; memberOnly?: boolean }[] = [
+    { id: 'chat', label: 'Chat', icon: MessageSquare, memberOnly: true },
     { id: 'members', label: 'Thành viên', icon: Users },
     { id: 'documents', label: 'Tài liệu', icon: BookOpen },
     { id: 'settings', label: 'Cài đặt', icon: Settings, ownerOnly: true },
@@ -719,23 +741,17 @@ const GroupWorkspacePage = () => {
     }
   };
 
-  const handleSendInvite = async () => {
-    if (!groupId || !inviteUserId.trim()) return;
-    setInviteLoading(true);
+  const handleSendInvite = async (userId: string) => {
+    if (!groupId) return;
+    setInviteLoadingId(userId);
     setInviteError('');
-    setInviteSuccess(false);
     try {
-      await inviteMemberApi(groupId, inviteUserId.trim());
-      setInviteSuccess(true);
-      setInviteUserId('');
-      setTimeout(() => {
-        setInviteSuccess(false);
-        setShowInviteModal(false);
-      }, 2000);
+      await inviteMemberApi(groupId, userId);
+      setInvitedIds(prev => [...prev, userId]);
     } catch (err: any) {
       setInviteError(err?.response?.data?.message || 'Gửi lời mời thất bại.');
     } finally {
-      setInviteLoading(false);
+      setInviteLoadingId(null);
     }
   };
 
@@ -925,16 +941,16 @@ const GroupWorkspacePage = () => {
                   className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200"
                 >
                   {joinLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                  {joinLoading ? 'Đang gửi...' : 'Tham gia nhóm'}
+                  {joinLoading ? 'Đang gửi...' : 'Xin tham gia'}
                 </button>
               )}
             </div>
           </div>
 
           {/* ——— Tab Navigation ——— */}
-          {isMember && (
+          {(isMember || group.visibility === 'PUBLIC') && (
             <div className="flex gap-0.5 border-t border-slate-100 -mx-0">
-              {tabs.filter(t => !t.ownerOnly || isOwner).map(({ id, label, icon: Icon }) => (
+              {tabs.filter(t => (!t.ownerOnly || isOwner) && (!t.memberOnly || isMember)).map(({ id, label, icon: Icon }) => (
                 <button
                   key={id}
                   onClick={() => setActiveTab(id)}
@@ -958,29 +974,21 @@ const GroupWorkspacePage = () => {
 
       {/* ——— Tab Content / Lock screen ——— */}
       <div className="max-w-[1100px] mx-auto px-5 md:px-8 py-6">
-        {!isMember ? (
+        {(!isMember && group.visibility === 'PRIVATE') ? (
           <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center max-w-xl mx-auto shadow-sm space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto text-indigo-500">
-              {group.visibility === 'PUBLIC' ? (
-                <Globe className="w-8 h-8" />
-              ) : (
-                <Lock className="w-8 h-8" />
-              )}
+              <Lock className="w-8 h-8" />
             </div>
             <div className="space-y-1.5">
               <h3 className="text-lg font-bold text-slate-800">
                 {membershipStatus === 'PENDING'
                   ? 'Yêu cầu đang chờ duyệt'
-                  : group.visibility === 'PUBLIC'
-                    ? `Chào mừng bạn đến với nhóm ${group.name}`
-                    : 'Đây là nhóm riêng tư'}
+                  : 'Nhóm riêng tư'}
               </h3>
               <p className="text-sm text-slate-500 leading-relaxed">
                 {membershipStatus === 'PENDING'
                   ? 'Yêu cầu tham gia của bạn đã được gửi. Chờ chủ nhóm phê duyệt nhé!'
-                  : group.visibility === 'PUBLIC'
-                    ? 'Hãy tham gia nhóm học tập này để có thể xem tài liệu, danh sách thành viên và thảo luận cùng mọi người.'
-                    : 'Nội dung thảo luận học tập, tài liệu chia sẻ và danh sách thành viên được ẩn. Hãy gửi yêu cầu tham gia để cùng học tập nhé!'}
+                  : 'Nội dung thảo luận học tập, tài liệu chia sẻ và danh sách thành viên được ẩn. Hãy gửi yêu cầu tham gia để cùng học tập nhé!'}
               </p>
             </div>
 
@@ -996,13 +1004,13 @@ const GroupWorkspacePage = () => {
                 className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200"
               >
                 {joinLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-                {joinLoading ? 'Đang gửi...' : 'Tham gia nhóm'}
+                {joinLoading ? 'Đang gửi...' : 'Xin tham gia'}
               </button>
             )}
           </div>
         ) : (
           <>
-            {activeTab === 'chat' && <ChatTab group={group} />}
+            {activeTab === 'chat' && isMember && <ChatTab group={group} canContribute={canContribute} />}
             {activeTab === 'members' && (
               <MembersTab
                 group={group}
@@ -1014,7 +1022,7 @@ const GroupWorkspacePage = () => {
                 onInviteClick={() => setShowInviteModal(true)}
               />
             )}
-            {activeTab === 'documents' && <DocumentsTab />}
+            {activeTab === 'documents' && <DocumentsTab isMember={isMember} canContribute={canContribute} />}
             {activeTab === 'settings' && isOwner && (
               <SettingsTab
                 group={group}
@@ -1075,7 +1083,7 @@ const GroupWorkspacePage = () => {
                 <p className="text-xs text-slate-400 mt-0.5">Nhập User ID để gửi lời mời tham gia nhóm</p>
               </div>
               <button
-                onClick={() => { setShowInviteModal(false); setInviteUserId(''); setInviteError(''); setInviteSuccess(false); }}
+                onClick={() => { setShowInviteModal(false); setInviteError(''); }}
                 className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl border-0 bg-transparent cursor-pointer transition-all"
               >
                 <X className="w-4 h-4" />
@@ -1083,32 +1091,50 @@ const GroupWorkspacePage = () => {
             </div>
             <div className="space-y-3">
               {inviteError && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-rose-50 text-rose-600 rounded-xl text-sm">
+                <div className="flex items-center gap-2 px-4 py-3 bg-rose-50 text-rose-600 rounded-xl text-sm mb-3">
                   <AlertCircle className="w-4 h-4 shrink-0" />
                   {inviteError}
                 </div>
               )}
-              {inviteSuccess && (
-                <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-600 rounded-xl text-sm">
-                  <CheckCircle className="w-4 h-4 shrink-0" />
-                  Đã gửi lời mời thành công!
-                </div>
-              )}
-              <input
-                type="text"
-                value={inviteUserId}
-                onChange={e => setInviteUserId(e.target.value)}
-                placeholder="Nhập User ID của người muốn mời..."
-                className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all"
-              />
-              <button
-                onClick={handleSendInvite}
-                disabled={inviteLoading || !inviteUserId.trim() || inviteSuccess}
-                className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200 flex items-center justify-center gap-2"
-              >
-                {inviteLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-                {inviteLoading ? 'Đang gửi...' : 'Gửi lời mời'}
-              </button>
+              
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {friendsLoading ? (
+                  <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
+                ) : friendsList?.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 text-sm">Bạn chưa có bạn bè nào để mời.</div>
+                ) : (
+                  friendsList?.map(friend => {
+                    const isAlreadyMember = members.some(m => m.userId === friend.id);
+                    const isInvited = invitedIds.includes(friend.id);
+                    const isDisabed = isAlreadyMember || isInvited;
+
+                    return (
+                      <div key={friend.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 transition-all">
+                        <div className="flex items-center gap-3">
+                          <AvatarCircle name={friend.name} avatarUrl={friend.avatarUrl ?? undefined} />
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">{friend.name}</p>
+                            <p className="text-xs text-slate-400">{friend.email}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleSendInvite(friend.id)}
+                          disabled={isDisabed || inviteLoadingId === friend.id}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-0 transition-all cursor-pointer outline-none active:scale-95 ${
+                            isAlreadyMember ? 'bg-slate-100 text-slate-400 cursor-not-allowed active:scale-100' :
+                            isInvited ? 'bg-emerald-50 text-emerald-600 cursor-not-allowed active:scale-100' :
+                            'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                          }`}
+                        >
+                          {inviteLoadingId === friend.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 
+                           isAlreadyMember ? 'Đã tham gia' :
+                           isInvited ? 'Đã gửi lời mời' : 'Mời'}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
           </div>
         </div>

@@ -10,7 +10,7 @@ export const findGroupByKeyword = async (keyword: string) => {
         { description: { contains: keyword, mode: "insensitive" } }
       ],
       visibility: {
-        in: ["PUBLIC", "INVITE"]
+        in: ["PUBLIC", "PRIVATE"] // INVITE is hidden, PRIVATE is visible but cannot be joined easily
       },
       isActive: true,
       isDeleted: false
@@ -233,9 +233,18 @@ export const getInvitationByStatusAndType = async (groupId: string, type: Invita
       groupId: groupId,
       status,
       type
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true
+        }
+      }
     }
-  }
-  )
+  })
 }
 
 export const getInvitationByInviteId  = async(groupId: string,inviteId:string)=>{

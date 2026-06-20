@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   Search, Plus, Users, Lock, Globe, UserPlus, Bell, ChevronRight,
   BookOpen, Crown, CheckCircle, X, Compass, LayoutGrid, Upload,
-  Sparkles, FileText, Loader2, AlertCircle
+  Sparkles, FileText, Loader2, AlertCircle, UserCheck, Eye, Clock
 } from 'lucide-react';
 import {
   createGroupApi,
@@ -22,8 +22,15 @@ import type {
   InvitationData,
   CreateGroupPayload,
 } from '../features/group/services/group.service';
+import AvatarUpload from '../components/common/AvatarUpload';
 
 // ——— Helpers
+const getInitials = (name?: string) => {
+  if (!name || typeof name !== 'string') return 'G';
+  const words = name.trim().split(/\s+/);
+  return words.slice(-2).map(w => w[0] || '').join('').toUpperCase() || 'G';
+};
+
 const COVER_COLORS = [
   'from-indigo-500 to-purple-600',
   'from-cyan-500 to-blue-600',
@@ -35,8 +42,11 @@ const COVER_COLORS = [
   'from-green-500 to-emerald-600',
 ];
 
-const getCoverColor = (id: string) =>
-  COVER_COLORS[id.charCodeAt(id.length - 1) % COVER_COLORS.length];
+const getCoverColor = (id?: string) => {
+  if (!id) return COVER_COLORS[0];
+  const code = id.charCodeAt(id.length - 1);
+  return COVER_COLORS[isNaN(code) ? 0 : code % COVER_COLORS.length];
+};
 
 const VisibilityBadge = ({ visibility }: { visibility: GroupVisibility }) => {
   const map = {
@@ -53,16 +63,18 @@ const VisibilityBadge = ({ visibility }: { visibility: GroupVisibility }) => {
   );
 };
 
-const RoleBadge = ({ role }: { role: GroupRole }) => {
-  const map = {
-    OWNER: { label: 'Chủ nhóm', color: 'text-amber-700 bg-amber-50 border border-amber-200' },
-    MEMBER: { label: 'Thành viên', color: 'text-indigo-700 bg-indigo-50 border border-indigo-100' },
-    VIEWER: { label: 'Xem thôi', color: 'text-slate-600 bg-slate-100 border border-slate-200' },
+const RoleBadge = ({ role }: { role: string }) => {
+  const map: Record<string, { label: string, icon: React.ElementType, cls: string }> = {
+    OWNER: { label: 'Chủ nhóm', icon: Crown, cls: 'text-amber-700 bg-amber-50 border-amber-200' },
+    MEMBER: { label: 'Thành viên', icon: UserCheck, cls: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+    VIEWER: { label: 'Chỉ xem', icon: Eye, cls: 'text-slate-600 bg-slate-50 border-slate-200' },
+    PENDING: { label: 'Chờ duyệt', icon: Clock, cls: 'text-amber-600 bg-amber-50 border-amber-200' },
   };
-  const { label, color } = map[role];
+  const fallback = { label: role, icon: UserCheck, cls: 'text-slate-600 bg-slate-50 border-slate-200' };
+  const { label, icon: Icon, cls } = map[role] || fallback;
   return (
-    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold ${color}`}>
-      {role === 'OWNER' && <Crown className="w-2.5 h-2.5" />}
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border shadow-sm ${cls}`}>
+      <Icon className="w-2.5 h-2.5" />
       {label}
     </span>
   );
@@ -119,12 +131,14 @@ const CreateGroupModal = ({ onClose, onCreated }: CreateGroupModalProps) => {
             </div>
           )}
 
-          {/* Avatar upload placeholder */}
+          {/* Avatar upload */}
           <div className="flex justify-center">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-indigo-400 to-purple-600 flex flex-col items-center justify-center cursor-pointer hover:opacity-90 transition-opacity group">
-              <Upload className="w-6 h-6 text-white/80 group-hover:text-white" />
-              <span className="text-[9px] text-white/80 mt-1 font-bold">Ảnh bìa</span>
-            </div>
+            <AvatarUpload
+              value={form.avatarUrl}
+              onChange={(url) => setForm(f => ({ ...f, avatarUrl: url }))}
+              nameInitial={form.name || 'G'}
+              className="w-20 h-20"
+            />
           </div>
 
           {/* Tên nhóm */}
@@ -245,7 +259,11 @@ const DiscoverGroupCard = ({ group, onJoined }: { group: GroupData; onJoined?: (
           }`}
         >
           {status === 'loading' && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-          {status === 'loading' ? 'Đang gửi...' : status === 'done' ? '✓ Đã gửi yêu cầu' : group.visibility === 'INVITE' ? 'Xem nhóm' : 'Tham gia'}
+          {status === 'loading' 
+            ? 'Đang xử lý...' 
+            : status === 'done' 
+              ? 'Đã gửi yêu cầu'
+              : 'Xin tham gia'}
         </button>
       </div>
     </div>
@@ -538,7 +556,7 @@ const GroupsPage = () => {
                             {group.avatarUrl ? (
                               <img src={group.avatarUrl} alt={group.name} className="w-full h-full rounded-xl object-cover" />
                             ) : (
-                              <span className="text-sm font-black text-indigo-600">{group.name.charAt(0)}</span>
+                              <span className="text-sm font-black text-indigo-600">{(group.name || 'G').charAt(0)}</span>
                             )}
                           </div>
                         </div>
@@ -632,23 +650,26 @@ const GroupsPage = () => {
                     <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mx-auto mb-3" />
                     <p className="text-sm text-slate-400">Đang tìm kiếm nhóm...</p>
                   </div>
-                ) : discoverGroups.length === 0 ? (
-                  <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
-                    <Search className="w-8 h-8 text-slate-300 mx-auto mb-3" />
-                    <p className="text-sm font-bold text-slate-500">Không tìm thấy nhóm phù hợp</p>
-                    <p className="text-xs text-slate-400 mt-1">Thử từ khóa khác hoặc tạo nhóm mới</p>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-                    {discoverGroups.map(group => (
-                      <DiscoverGroupCard
-                        key={group.id}
-                        group={group}
-                        onJoined={fetchMyGroups}
-                      />
-                    ))}
-                  </div>
-                )}
+                ) : (() => {
+                  const filteredDiscover = discoverGroups.filter(g => !myGroups.some(my => my.id === g.id));
+                  return filteredDiscover.length === 0 ? (
+                    <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center">
+                      <Search className="w-8 h-8 text-slate-300 mx-auto mb-3" />
+                      <p className="text-sm font-bold text-slate-500">Không tìm thấy nhóm phù hợp chưa tham gia</p>
+                      <p className="text-xs text-slate-400 mt-1">Thử từ khóa khác hoặc tạo nhóm mới</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                      {filteredDiscover.map(group => (
+                        <DiscoverGroupCard
+                          key={group.id}
+                          group={group}
+                          onJoined={fetchMyGroups}
+                        />
+                      ))}
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* Nhóm theo chủ đề */}

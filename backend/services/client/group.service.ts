@@ -65,8 +65,7 @@ export const groupInfoGetService = async (groupId: string, myId: string) => {
   const group: any = await findGroupById(groupId, myId);
   if (!group) throw new Error("Nhóm không tồn tại");
   if (group.visibility === "PRIVATE") {
-    const me = await findGroupMember(groupId, myId);
-    if (!me) throw new Error("Bạn không có quyền xem nhóm riêng tư");
+    // Trả về thông tin cơ bản cho frontend xử lý ẩn nội dung, không throw error
   }
   
   let myRole = group.members?.[0]?.role;
@@ -217,7 +216,7 @@ export const joinRequestPostService = async (groupId: string, myId: string) => {
   if (!group) {
     throw new Error("Không tồn tại nhóm");
   }
-  if (group.visibility !== "PUBLIC") {
+  if (group.visibility === "INVITE") {
     throw new Error("Nhóm này không cho phép gửi yêu cầu tham gia");
   }
   const isMember = await findGroupMember(groupId, myId);
@@ -228,6 +227,8 @@ export const joinRequestPostService = async (groupId: string, myId: string) => {
   if (pending?.status === "PENDING") {
     throw new Error("Bạn đã gửi yêu cầu tham gia nhóm rồi");
   }
+
+  // PUBLIC and PRIVATE both create PENDING request
   const result = await upsertInvitation(groupId, myId, undefined, "REQUEST", "PENDING");
   return {
     data: result,

@@ -25,11 +25,15 @@ export interface GroupWithRole extends GroupData {
 
 export interface MemberData {
   id: string;
-  name: string;
-  email: string;
-  avatarUrl?: string;
+  userId: string;
   role: GroupRole;
   joinedAt: string;
+  user: {
+    id: string;
+    name: string;
+    email: string;
+    avatarUrl?: string;
+  };
 }
 
 export interface JoinRequestData {
