@@ -14,8 +14,12 @@ export const findGroupByKeyword = async (keyword: string) => {
       },
       isActive: true,
       isDeleted: false
+    },
+    include: {
+      _count: {
+        select: { members: true }
+      }
     }
-
   })
 }
 
@@ -53,17 +57,37 @@ export const getMyListGroup = async (myId: string, keyword?: string) => {
             { description: { contains: keyword, mode: "insensitive" } }
           ]
         } : {})
+    },
+    include: {
+      _count: {
+        select: { members: true }
+      },
+      members: {
+        where: { userId: myId },
+        select: { role: true }
+      }
     }
   })
 }
 
 
-export const findGroupById = async (groupId: string) => {
+export const findGroupById = async (groupId: string, myId?: string) => {
   return prisma.group.findFirst({
     where: {
       id: groupId,
       isDeleted: false,
       isActive: true
+    },
+    include: {
+      _count: {
+        select: { members: true }
+      },
+      ...(myId ? {
+        members: {
+          where: { userId: myId },
+          select: { role: true }
+        }
+      } : {})
     }
   })
 }

@@ -18,6 +18,7 @@ const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const LandingPage = lazy(() => import('../pages/LandingPage'));
 const DocumentsPage = lazy(() => import('../pages/DocumentsPage'));
 const GroupsPage = lazy(() => import('../pages/GroupsPage'));
+const GroupWorkspacePage = lazy(() => import('../pages/GroupWorkspacePage'));
 
 // Lazy load friend pages (from feature/friend-ui)
 const FriendsPage = lazy(() => import('../pages/FriendsPage'));
@@ -114,6 +115,7 @@ export const AppRouter = () => {
           <Route path={ROUTES.CHAT} element={<ChatPage />} />
           <Route path={ROUTES.DOCUMENTS} element={<DocumentsPage />} />
           <Route path={ROUTES.GROUPS} element={<GroupsPage />} />
+          <Route path="/groups/:groupId" element={<GroupWorkspacePage />} />
 
           {/* ——— Friend routes (from feature/friend-ui) */}
           <Route path="/friends" element={<FriendsPage />} />

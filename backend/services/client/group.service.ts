@@ -21,6 +21,7 @@ import {
   updateGroupInfo,
   updateStatusInvitation,
   upsertInvitation,
+  findRequestPendingInvitation,
 } from "../../repositories/client/group.repo";
 import { groupTypeData } from "../../types/client/group.types";
 
@@ -34,28 +35,57 @@ export const creatGroupPostService = async (data: groupTypeData, ownerId: string
 
 export const myGroupGetService = async (myId: string, keyword?: string) => {
   const result = await getMyListGroup(myId, keyword);
+  const formatted = result.map((g: any) => ({
+    ...g,
+    myRole: g.members?.[0]?.role,
+    memberCount: g._count?.members || 0,
+    members: undefined,
+    _count: undefined
+  }));
   return {
-    data: result,
+    data: formatted,
     message: "Thanh cong lay danh sach",
   };
 };
 
 export const findGroupGetService = async (keyword: string) => {
   const result = await findGroupByKeyword(keyword);
+  const formatted = result.map((g: any) => ({
+    ...g,
+    memberCount: g._count?.members || 0,
+    _count: undefined
+  }));
   return {
-    data: result,
+    data: formatted,
     message: "Tim kiem thanh cong",
   };
 };
 
 export const groupInfoGetService = async (groupId: string, myId: string) => {
-  const group = await findGroupById(groupId);
+  const group: any = await findGroupById(groupId, myId);
   if (!group) throw new Error("Nhóm không tồn tại");
   if (group.visibility === "PRIVATE") {
     const me = await findGroupMember(groupId, myId);
     if (!me) throw new Error("Bạn không có quyền xem nhóm riêng tư");
   }
-  return { data: group, message: "Thong tin group" };
+  
+  let myRole = group.members?.[0]?.role;
+  if (!myRole) {
+    const pendingReq = await findRequestPendingInvitation(groupId, myId);
+    if (pendingReq) {
+      myRole = "PENDING";
+    }
+  }
+
+  const formatted = {
+    ...group,
+    myRole,
+    memberCount: group._count?.members || 0,
+    members: undefined,
+    _count: undefined
+  };
+
+  return { data: formatted, message: "Thong tin group" };
 };
 
 export const memberGroupGetService = async (groupId: string, myId: string) => {
@@ -129,8 +159,8 @@ export const updateGroupPatchService = async (groupId: string, data: groupTypeDa
   if (!target) {
     throw new Error("Không phải là thành viên nhóm, không thể cập nhật thông tin");
   }
-  if (data.visibility && target.role !== "OWNER") {
-    throw new Error("Không phải chủ nhóm, không thể thay đổi trạng thái hiển thị");
+  if (target.role !== "OWNER") {
+    throw new Error("Chỉ chủ nhóm mới có thể cập nhật thông tin nhóm");
   }
   const result = await updateGroupInfo(data, groupId);
   return {

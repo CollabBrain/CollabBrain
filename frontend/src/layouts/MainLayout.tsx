@@ -207,6 +207,11 @@ const MainLayout = () => {
           <div className="flex-1 h-full overflow-hidden">
             <Outlet />
           </div>
+        ) : pathname.match(/^\/groups\/.+/) ? (
+          // GroupWorkspacePage: full width, tự cuộn, không giới hạn max-width
+          <div className="flex-1 overflow-y-auto">
+            <Outlet />
+          </div>
         ) : (
           // Các trang khác (Documents, Friends, Groups, Profile) có thanh cuộn và padding
           <div className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-8">

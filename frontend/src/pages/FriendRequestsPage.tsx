@@ -26,11 +26,10 @@ export const FriendRequestsPage: React.FC = () => {
           <button
             key={key}
             onClick={() => setActiveTab(key)}
-            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${
-              activeTab === key
+            className={`flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200 ${activeTab === key
                 ? 'bg-white text-indigo-700 shadow-sm'
                 : 'text-slate-500 hover:text-slate-700'
-            }`}
+              }`}
           >
             <Icon size={15} />
             {label}
