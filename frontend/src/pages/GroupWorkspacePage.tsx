@@ -1,0 +1,1146 @@
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
+import { useFriends } from '../hooks/useFriends';
+import {
+  ArrowLeft, MessageSquare, Users, Settings, LogOut, Crown, MoreHorizontal,
+  UserPlus, Search, Eye, Trash2, Globe, Lock, UserCheck,
+  BookOpen, FileText, CheckCircle, X, Bell, Upload, GraduationCap,
+  Hash, ClipboardList, ChevronDown, Clock, Loader2, AlertCircle, RefreshCw,
+} from 'lucide-react';
+import {
+  getGroupInfoApi,
+  getGroupMembersApi,
+  getJoinRequestsApi,
+  joinRequestApi,
+  leaveGroupApi,
+  removeMemberApi,
+  changeRoleApi,
+  acceptJoinRequestApi,
+  rejectJoinRequestApi,
+  inviteMemberApi,
+  updateGroupApi,
+  deleteGroupApi,
+} from '../features/group/services/group.service';
+import type {
+  GroupWithRole,
+  GroupVisibility,
+  GroupRole,
+  MemberData,
+  JoinRequestData,
+  UpdateGroupPayload,
+} from '../features/group/services/group.service';
+
+// ——— Types
+type ActiveTab = 'chat' | 'members' | 'documents' | 'settings';
+type MembershipStatus = 'OWNER' | 'MEMBER' | 'VIEWER' | 'PENDING' | 'NOT_MEMBER';
+
+// ——— Helpers
+const getInitials = (name: string) => name.split(' ').slice(-2).map(w => w[0]).join('').toUpperCase();
+
+const COVER_COLORS = [
+  'from-indigo-500 to-purple-600',
+  'from-cyan-500 to-blue-600',
+  'from-emerald-500 to-teal-600',
+  'from-violet-500 to-pink-600',
+  'from-amber-500 to-orange-600',
+  'from-sky-500 to-indigo-500',
+];
+const getCoverGradient = (id: string) => {
+  const idx = id.charCodeAt(id.length - 1) % COVER_COLORS.length;
+  const stops = COVER_COLORS[idx].replace('from-', '').replace('to-', '').split(' ');
+  return `linear-gradient(135deg, var(--tw-gradient-from) 0%, var(--tw-gradient-to) 100%)`;
+};
+const getCoverColor = (id: string) =>
+  COVER_COLORS[id.charCodeAt(id.length - 1) % COVER_COLORS.length];
+
+const RoleBadge = ({ role }: { role: GroupRole }) => {
+  const map = {
+    OWNER: { label: 'Chủ nhóm', icon: Crown, cls: 'text-amber-700 bg-amber-50 border-amber-200' },
+    MEMBER: { label: 'Thành viên', icon: UserCheck, cls: 'text-indigo-700 bg-indigo-50 border-indigo-200' },
+    VIEWER: { label: 'Chỉ xem', icon: Eye, cls: 'text-slate-600 bg-slate-50 border-slate-200' },
+  };
+  const { label, icon: Icon, cls } = map[role];
+  return (
+    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${cls}`}>
+      <Icon className="w-2.5 h-2.5" />
+      {label}
+    </span>
+  );
+};
+
+const AvatarCircle = ({ name, avatarUrl, size = 'md', gradient = 'from-indigo-500 to-purple-600', isOnline }: {
+  name: string; avatarUrl?: string; size?: 'sm' | 'md' | 'lg'; gradient?: string; isOnline?: boolean;
+}) => {
+  const sz = { sm: 'w-8 h-8 text-xs', md: 'w-10 h-10 text-sm', lg: 'w-12 h-12 text-base' }[size];
+  return (
+    <div className="relative shrink-0">
+      <div className={`${sz} rounded-full bg-gradient-to-br ${gradient} flex items-center justify-center text-white font-bold overflow-hidden`}>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+        ) : (
+          getInitials(name)
+        )}
+      </div>
+      {isOnline !== undefined && (
+        <span className={`absolute bottom-0 right-0 w-2.5 h-2.5 rounded-full border-2 border-white ${isOnline ? 'bg-emerald-500' : 'bg-slate-300'}`} />
+      )}
+    </div>
+  );
+};
+
+// ——— Tab: Members
+const MembersTab = ({
+  group,
+  members,
+  membersLoading,
+  joinRequests,
+  joinRequestsLoading,
+  onMembersChange,
+  onInviteClick,
+}: {
+  group: GroupWithRole;
+  members: MemberData[];
+  membersLoading: boolean;
+  joinRequests: JoinRequestData[];
+  joinRequestsLoading: boolean;
+  onMembersChange: () => void;
+  onInviteClick: () => void;
+}) => {
+  const [search, setSearch] = useState('');
+  const [openDropdown, setOpenDropdown] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+
+  const filtered = members.filter(m =>
+    (m.user?.name || '').toLowerCase().includes(search.toLowerCase()) ||
+    (m.user?.email || '').toLowerCase().includes(search.toLowerCase())
+  );
+  const owners = filtered.filter(m => m.role === 'OWNER');
+  const others = filtered.filter(m => m.role !== 'OWNER');
+  const isOwner = group.myRole === 'OWNER';
+
+  const handleRoleChange = async (memberId: string, role: GroupRole) => {
+    setActionLoading(`role-${memberId}`);
+    try {
+      await changeRoleApi(group.id, memberId, role);
+      onMembersChange();
+    } catch {
+      // silent fail
+    } finally {
+      setActionLoading(null);
+      setOpenDropdown(null);
+    }
+  };
+
+  const handleKick = async (memberId: string) => {
+    setActionLoading(`kick-${memberId}`);
+    try {
+      await removeMemberApi(group.id, memberId);
+      onMembersChange();
+    } catch {
+      // silent fail
+    } finally {
+      setActionLoading(null);
+      setOpenDropdown(null);
+    }
+  };
+
+  const handleAcceptRequest = async (req: JoinRequestData) => {
+    setActionLoading(`accept-${req.id}`);
+    try {
+      await acceptJoinRequestApi(group.id, req.id);
+      onMembersChange();
+    } catch {
+      // silent fail
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectRequest = async (req: JoinRequestData) => {
+    setActionLoading(`reject-${req.id}`);
+    try {
+      await rejectJoinRequestApi(group.id, req.id);
+      onMembersChange();
+    } catch {
+      // silent fail
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const MemberRow = ({ member }: { member: MemberData }) => (
+    <div className="flex items-center gap-3 px-5 py-3.5 hover:bg-indigo-50/30 transition-colors group relative last:rounded-b-2xl">
+      <AvatarCircle name={member.user?.name || 'Unknown'} avatarUrl={member.user?.avatarUrl} />
+      <div className="flex-1 min-w-0">
+        <div className="flex items-center gap-2 flex-wrap">
+          <p className="text-sm font-semibold text-slate-800">{member.user?.name || 'Unknown User'}</p>
+          <RoleBadge role={member.role} />
+        </div>
+        <p className="text-xs text-slate-400 truncate mt-0.5">{member.user?.email || ''}</p>
+      </div>
+      <div className="flex items-center gap-3 shrink-0">
+        {isOwner && member.role !== 'OWNER' && (
+          <div className="relative">
+            <button
+              onClick={() => setOpenDropdown(openDropdown === member.userId ? null : member.userId)}
+              className="p-1.5 text-slate-300 hover:text-slate-600 hover:bg-slate-100 rounded-lg border-0 bg-transparent cursor-pointer opacity-0 group-hover:opacity-100 transition-all"
+            >
+              {actionLoading?.startsWith(`kick-${member.userId}`) || actionLoading?.startsWith(`role-${member.userId}`)
+                ? <Loader2 className="w-4 h-4 animate-spin" />
+                : <MoreHorizontal className="w-4 h-4" />
+              }
+            </button>
+            {openDropdown === member.userId && (
+              <>
+                <div className="fixed inset-0 z-20" onClick={() => setOpenDropdown(null)} />
+                <div className="absolute right-0 top-9 z-30 w-44 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden">
+                  <div className="p-2 space-y-0.5">
+                    <p className="px-3 py-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-wider">Đổi vai trò</p>
+                    {(['MEMBER', 'VIEWER'] as GroupRole[]).map(role => (
+                      <button key={role} onClick={() => handleRoleChange(member.userId, role)}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold rounded-xl border-0 cursor-pointer transition-all text-left ${member.role === role ? 'bg-indigo-50 text-indigo-600' : 'text-slate-600 hover:bg-slate-50'}`}>
+                        {role === 'MEMBER' ? <UserCheck className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        {role === 'MEMBER' ? 'Thành viên' : 'Chỉ xem'}
+                        {member.role === role && <CheckCircle className="w-3 h-3 ml-auto text-indigo-500" />}
+                      </button>
+                    ))}
+                    <div className="border-t border-slate-100 mt-1 pt-1">
+                      <button onClick={() => handleKick(member.userId)}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl border-0 cursor-pointer transition-all">
+                        <LogOut className="w-3.5 h-3.5" />
+                        Mời ra khỏi nhóm
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="space-y-5">
+      {/* Toolbar */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+          <input type="text" value={search} onChange={e => setSearch(e.target.value)}
+            placeholder="Tìm thành viên theo tên, email..."
+            className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 rounded-xl focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 outline-none transition-all" />
+        </div>
+        {isOwner && (
+          <button onClick={onInviteClick}
+            className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200 shrink-0">
+            <UserPlus className="w-4 h-4" />
+            Mời thành viên
+          </button>
+        )}
+      </div>
+
+      {/* Stats bar */}
+      <div className="flex gap-3">
+        {[
+          { label: 'Tổng thành viên', value: group.memberCount, icon: Users, color: 'text-indigo-600 bg-indigo-50' },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="bg-white border border-slate-100 rounded-2xl p-4 flex items-center gap-3 flex-1 max-w-[250px]">
+            <div className={`w-9 h-9 rounded-xl ${color} flex items-center justify-center`}>
+              <Icon className="w-4 h-4" />
+            </div>
+            <div>
+              <p className="text-lg font-black text-slate-800 leading-none">{value}</p>
+              <p className="text-xs text-slate-400 mt-0.5">{label}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      {/* Members list */}
+      {membersLoading ? (
+        <div className="bg-white border border-slate-100 rounded-2xl p-10 text-center">
+          <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-400">Đang tải danh sách thành viên...</p>
+        </div>
+      ) : (
+        <div className="bg-white border border-slate-100 rounded-2xl">
+          {owners.length > 0 && (
+            <div>
+              <div className="px-5 py-2.5 bg-amber-50/60 border-b border-amber-100 rounded-t-2xl">
+                <p className="text-[11px] font-bold text-amber-700 uppercase tracking-wider flex items-center gap-1.5">
+                  <Crown className="w-3 h-3" /> Chủ nhóm
+                </p>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {owners.map(m => <MemberRow key={m.userId} member={m} />)}
+              </div>
+            </div>
+          )}
+          {others.length > 0 && (
+            <div>
+              <div className={`px-5 py-2.5 bg-slate-50/60 border-y border-slate-100 ${owners.length === 0 ? 'rounded-t-2xl' : ''}`}>
+                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="w-3 h-3" /> Thành viên · {others.length}
+                </p>
+              </div>
+              <div className="divide-y divide-slate-50">
+                {others.map(m => <MemberRow key={m.userId} member={m} />)}
+              </div>
+            </div>
+          )}
+          {filtered.length === 0 && !membersLoading && (
+            <div className="text-center py-12">
+              <Users className="w-10 h-10 text-slate-200 mx-auto mb-3" />
+              <p className="text-sm text-slate-400">Không tìm thấy thành viên nào</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Join Requests (OWNER only) */}
+      {isOwner && !joinRequestsLoading && joinRequests.length > 0 && (
+        <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-50 flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-bold text-slate-800">Yêu cầu tham gia</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Duyệt hoặc từ chối yêu cầu vào nhóm</p>
+            </div>
+            <span className="px-2.5 py-1 bg-amber-100 text-amber-700 text-xs font-bold rounded-full">
+              {joinRequests.length} đang chờ
+            </span>
+          </div>
+          <div className="divide-y divide-slate-50">
+            {joinRequests.map(req => (
+              <div key={req.id} className="flex items-center gap-3 px-5 py-4">
+                <AvatarCircle name={req.user.name} avatarUrl={req.user.avatarUrl} gradient="from-slate-400 to-slate-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-slate-800">{req.user.name}</p>
+                  <p className="text-xs text-slate-400">{req.user.email} · {new Date(req.createdAt).toLocaleDateString('vi-VN')}</p>
+                </div>
+                <div className="flex gap-2 shrink-0">
+                  <button
+                    onClick={() => handleAcceptRequest(req)}
+                    disabled={actionLoading === `accept-${req.id}` || actionLoading === `reject-${req.id}`}
+                    className="px-3 py-1.5 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg border-0 cursor-pointer transition-all disabled:opacity-60 flex items-center gap-1"
+                  >
+                    {actionLoading === `accept-${req.id}` && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Duyệt
+                  </button>
+                  <button
+                    onClick={() => handleRejectRequest(req)}
+                    disabled={actionLoading === `accept-${req.id}` || actionLoading === `reject-${req.id}`}
+                    className="px-3 py-1.5 text-xs font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg cursor-pointer transition-all border-0 disabled:opacity-60 flex items-center gap-1"
+                  >
+                    {actionLoading === `reject-${req.id}` && <Loader2 className="w-3 h-3 animate-spin" />}
+                    Từ chối
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ——— Tab: Documents
+const DocumentsTab = ({ isMember, canContribute }: { isMember: boolean; canContribute: boolean }) => (
+  <div className="space-y-5">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-base font-bold text-slate-800">Tài liệu học tập</h2>
+        <p className="text-xs text-slate-400 mt-0.5">Chia sẻ tài liệu, bài tập và ghi chú với nhóm</p>
+      </div>
+      {canContribute && (
+        <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border-0 cursor-pointer transition-all shadow-md shadow-indigo-200">
+          <Upload className="w-4 h-4" />
+          Tải lên
+        </button>
+      )}
+    </div>
+
+    {/* Quick categories */}
+    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      {[
+        { label: 'Bài giảng', icon: BookOpen, color: 'text-blue-600 bg-blue-50 border-blue-100' },
+        { label: 'Bài tập', icon: ClipboardList, color: 'text-purple-600 bg-purple-50 border-purple-100' },
+        { label: 'Đề thi', icon: FileText, color: 'text-rose-600 bg-rose-50 border-rose-100' },
+        { label: 'Ghi chú', icon: Hash, color: 'text-amber-600 bg-amber-50 border-amber-100' },
+      ].map(({ label, icon: Icon, color }) => (
+        <button key={label} className={`flex flex-col items-center gap-2 p-4 border rounded-2xl transition-all hover:shadow-md cursor-pointer bg-white ${color.split(' ').slice(1).join(' ')}`}>
+          <Icon className={`w-6 h-6 ${color.split(' ')[0]}`} />
+          <span className={`text-xs font-semibold ${color.split(' ')[0]}`}>{label}</span>
+        </button>
+      ))}
+    </div>
+
+    {canContribute && (
+      <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center hover:border-indigo-300 transition-all cursor-pointer group">
+        <div className="w-14 h-14 rounded-2xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center mx-auto mb-4 transition-all">
+          <Upload className="w-7 h-7 text-indigo-400" />
+        </div>
+        <p className="text-sm font-semibold text-slate-600">Kéo thả file vào đây hoặc nhấn để chọn</p>
+        <p className="text-xs text-slate-400 mt-2">Hỗ trợ PDF, Word, PowerPoint, ảnh (tối đa 50MB)</p>
+      </div>
+    )}
+  </div>
+);
+
+// ——— Tab: Settings
+const SettingsTab = ({
+  group,
+  onGroupUpdated,
+  onGroupDeleted,
+}: {
+  group: GroupWithRole;
+  onGroupUpdated: () => void;
+  onGroupDeleted: () => void;
+}) => {
+  const navigate = useNavigate();
+  const [form, setForm] = useState<UpdateGroupPayload>({
+    name: group.name,
+    description: group.description || '',
+    visibility: group.visibility,
+    avatarUrl: group.avatarUrl,
+  });
+  const [saving, setSaving] = useState(false);
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const [saveError, setSaveError] = useState('');
+  const [showDangerConfirm, setShowDangerConfirm] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveError('');
+    setSaveSuccess(false);
+    try {
+      await updateGroupApi(group.id, form);
+      setSaveSuccess(true);
+      onGroupUpdated();
+      setTimeout(() => setSaveSuccess(false), 3000);
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.message || 'Cập nhật thất bại, thử lại sau.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await deleteGroupApi(group.id);
+      navigate('/groups');
+    } catch (err: any) {
+      setSaveError(err?.response?.data?.message || 'Xóa nhóm thất bại.');
+      setDeleting(false);
+      setShowDangerConfirm(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5 max-w-2xl">
+      {/* Thông tin nhóm */}
+      <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-50">
+          <h3 className="text-sm font-bold text-slate-800">Thông tin nhóm</h3>
+          <p className="text-xs text-slate-400 mt-0.5">Cập nhật tên, mô tả và ảnh đại diện nhóm</p>
+        </div>
+        <div className="p-6 space-y-5">
+          {/* Avatar section */}
+          <div className="flex items-center gap-4">
+            <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${getCoverColor(group.id)} flex items-center justify-center text-white text-2xl font-black shadow-lg`}>
+              {group.avatarUrl
+                ? <img src={group.avatarUrl} alt={group.name} className="w-full h-full rounded-2xl object-cover" />
+                : getInitials(group.name)
+              }
+            </div>
+            <div>
+              <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50 px-4 py-2 rounded-xl transition-all cursor-pointer bg-transparent">
+                Đổi ảnh bìa
+              </button>
+              <p className="text-xs text-slate-400 mt-1.5">PNG, JPG · Tối đa 5MB</p>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">Tên nhóm</label>
+            <input type="text" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-xl outline-none transition-all" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-2">Mô tả</label>
+            <textarea rows={3} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+              placeholder="Mô tả mục đích và nội dung của nhóm học..."
+              className="w-full px-4 py-3 text-sm bg-slate-50 border border-slate-200 focus:bg-white focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-xl outline-none transition-all resize-none" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-bold text-slate-600 mb-3">Quyền riêng tư</label>
+            <div className="flex flex-wrap gap-2">
+              {([
+                { value: 'PUBLIC', label: 'Công khai', icon: Globe, desc: 'Ai cũng có thể xem và tham gia' },
+                { value: 'INVITE', label: 'Chỉ mời', icon: UserPlus, desc: 'Cần được mời mới vào được' },
+                { value: 'PRIVATE', label: 'Riêng tư', icon: Lock, desc: 'Chỉ thành viên mới thấy nội dung' },
+              ] as const).map(({ value, label, icon: Icon, desc }) => (
+                <button key={value} type="button" onClick={() => setForm(f => ({ ...f, visibility: value }))}
+                  className={`flex items-start gap-3 px-4 py-3 rounded-xl border-2 text-left transition-all cursor-pointer flex-1 min-w-[160px] ${form.visibility === value ? 'border-indigo-500 bg-indigo-50' : 'border-slate-200 hover:border-slate-300 bg-white'}`}>
+                  <Icon className={`w-4 h-4 mt-0.5 shrink-0 ${form.visibility === value ? 'text-indigo-600' : 'text-slate-400'}`} />
+                  <div>
+                    <p className={`text-xs font-bold ${form.visibility === value ? 'text-indigo-700' : 'text-slate-700'}`}>{label}</p>
+                    <p className={`text-[10px] mt-0.5 ${form.visibility === value ? 'text-indigo-500' : 'text-slate-400'}`}>{desc}</p>
+                  </div>
+                  {form.visibility === value && <CheckCircle className="w-4 h-4 text-indigo-500 ml-auto shrink-0 mt-0.5" />}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {saveError && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-rose-50 text-rose-600 rounded-xl text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              {saveError}
+            </div>
+          )}
+          {saveSuccess && (
+            <div className="flex items-center gap-2 px-4 py-3 bg-emerald-50 text-emerald-600 rounded-xl text-sm">
+              <CheckCircle className="w-4 h-4 shrink-0" />
+              Đã lưu thay đổi thành công!
+            </div>
+          )}
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="px-6 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200 flex items-center gap-2"
+          >
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />}
+            {saving ? 'Đang lưu...' : 'Lưu thay đổi'}
+          </button>
+        </div>
+      </div>
+
+      {/* Danger Zone */}
+      <div className="bg-white border border-rose-100 rounded-2xl overflow-hidden">
+        <div className="px-6 py-4 border-b border-rose-50">
+          <h3 className="text-sm font-bold text-rose-600">Vùng nguy hiểm</h3>
+          <p className="text-xs text-slate-500 mt-0.5">Hành động này không thể hoàn tác.</p>
+        </div>
+        <div className="p-5">
+          {!showDangerConfirm ? (
+            <button onClick={() => setShowDangerConfirm(true)}
+              className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-rose-600 border border-rose-200 hover:bg-rose-50 hover:border-rose-400 rounded-xl cursor-pointer transition-all bg-transparent">
+              <Trash2 className="w-4 h-4" />
+              Xóa nhóm này
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm text-slate-600">Bạn có chắc chắn muốn xóa nhóm <strong className="text-slate-800">{group.name}</strong>? Tất cả dữ liệu sẽ bị xóa vĩnh viễn.</p>
+              <div className="flex gap-2">
+                <button
+                  onClick={handleDelete}
+                  disabled={deleting}
+                  className="px-4 py-2 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-60 rounded-xl cursor-pointer border-0 transition-all flex items-center gap-2"
+                >
+                  {deleting && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {deleting ? 'Đang xóa...' : 'Xác nhận xóa'}
+                </button>
+                <button onClick={() => setShowDangerConfirm(false)}
+                  className="px-4 py-2 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl cursor-pointer border-0 transition-all">
+                  Hủy
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ——— Chat Placeholder
+const ChatTab = ({ group, canContribute }: { group: GroupWithRole, canContribute: boolean }) => (
+  <div className="flex flex-col bg-white rounded-2xl border border-slate-100 overflow-hidden" style={{ minHeight: 480 }}>
+    <div className="px-5 py-3.5 border-b border-slate-100 flex items-center gap-3 bg-white">
+      <div className="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center">
+        <MessageSquare className="w-4 h-4 text-indigo-500" />
+      </div>
+      <div>
+        <p className="text-sm font-semibold text-slate-800">{group.name}</p>
+        <p className="text-xs text-slate-400">{group.memberCount} thành viên</p>
+      </div>
+    </div>
+    <div className="flex-1 flex flex-col items-center justify-center gap-4 text-center px-6 py-16">
+      {canContribute ? (
+        <>
+          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-indigo-100 to-purple-100 flex items-center justify-center">
+            <MessageSquare className="w-8 h-8 text-indigo-400" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-slate-700">Chat nhóm đang được phát triển</p>
+            <p className="text-sm text-slate-400 max-w-sm leading-relaxed mt-1.5">
+              Tính năng chat nhóm realtime sẽ sớm ra mắt. Theo dõi cập nhật nhé!
+            </p>
+          </div>
+          <span className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 text-indigo-600 text-xs font-semibold rounded-xl">
+            <Bell className="w-3.5 h-3.5" />
+            Sắp có mặt
+          </span>
+        </>
+      ) : (
+        <>
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center">
+            <Eye className="w-8 h-8 text-slate-400" />
+          </div>
+          <div>
+            <p className="text-base font-bold text-slate-700">Bạn đang ở chế độ Chỉ xem</p>
+            <p className="text-sm text-slate-400 max-w-sm leading-relaxed mt-1.5">
+              Bạn có thể đọc tin nhắn nhưng không thể nhắn tin vào nhóm này.
+            </p>
+          </div>
+        </>
+      )}
+    </div>
+  </div>
+);
+
+// ——— Main Component
+const GroupWorkspacePage = () => {
+  const { groupId } = useParams<{ groupId: string }>();
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const initialTab = (searchParams.get('tab') as ActiveTab) || 'members';
+  const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+
+  // ——— Data state
+  const [group, setGroup] = useState<GroupWithRole | null>(null);
+  const [groupLoading, setGroupLoading] = useState(true);
+  const [groupError, setGroupError] = useState('');
+
+  const [members, setMembers] = useState<MemberData[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
+
+  const [joinRequests, setJoinRequests] = useState<JoinRequestData[]>([]);
+  const [joinRequestsLoading, setJoinRequestsLoading] = useState(false);
+
+  // ——— UI state
+  const [showLeaveModal, setShowLeaveModal] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
+  const [inviteLoadingId, setInviteLoadingId] = useState<string | null>(null);
+  const [invitedIds, setInvitedIds] = useState<string[]>([]);
+  const [inviteError, setInviteError] = useState('');
+
+  const { data: friendsList, isLoading: friendsLoading } = useFriends();
+
+  const [leaveLoading, setLeaveLoading] = useState(false);
+  const [joinLoading, setJoinLoading] = useState(false);
+  const [openJoinedDropdown, setOpenJoinedDropdown] = useState(false);
+  const [openPendingDropdown, setOpenPendingDropdown] = useState(false);
+
+  // ——— Derived
+  const membershipStatus: MembershipStatus = group
+    ? (group.myRole as MembershipStatus) ?? 'NOT_MEMBER'
+    : 'NOT_MEMBER';
+
+  const isOwner = membershipStatus === 'OWNER';
+  const isMember = ['OWNER', 'MEMBER', 'VIEWER'].includes(membershipStatus);
+  const canContribute = ['OWNER', 'MEMBER'].includes(membershipStatus);
+
+  const tabs: { id: ActiveTab; label: string; icon: React.ElementType; ownerOnly?: boolean; memberOnly?: boolean }[] = [
+    { id: 'chat', label: 'Chat', icon: MessageSquare, memberOnly: true },
+    { id: 'members', label: 'Thành viên', icon: Users },
+    { id: 'documents', label: 'Tài liệu', icon: BookOpen },
+    { id: 'settings', label: 'Cài đặt', icon: Settings, ownerOnly: true },
+  ];
+
+  // ——— Fetch group info
+  const fetchGroup = useCallback(async () => {
+    if (!groupId) return;
+    setGroupLoading(true);
+    setGroupError('');
+    try {
+      const res = await getGroupInfoApi(groupId);
+      setGroup(res.data?.data ?? null);
+    } catch (err: any) {
+      if (err?.response?.status === 403) {
+        // Group exists but user not member → still show as NOT_MEMBER
+        setGroup({ id: groupId } as any);
+      } else {
+        setGroupError(err?.response?.data?.message || 'Không thể tải thông tin nhóm.');
+      }
+    } finally {
+      setGroupLoading(false);
+    }
+  }, [groupId]);
+
+  // ——— Fetch members
+  const fetchMembers = useCallback(async () => {
+    if (!groupId) return;
+    setMembersLoading(true);
+    try {
+      const res = await getGroupMembersApi(groupId);
+      setMembers(res.data?.data ?? []);
+    } catch {
+      // silent
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [groupId]);
+
+  // ——— Fetch join requests (owner only)
+  const fetchJoinRequests = useCallback(async () => {
+    if (!groupId || !isOwner) return;
+    setJoinRequestsLoading(true);
+    try {
+      const res = await getJoinRequestsApi(groupId);
+      const pending = (res.data?.data ?? []).filter(r => r.status === 'PENDING');
+      setJoinRequests(pending);
+    } catch {
+      // silent
+    } finally {
+      setJoinRequestsLoading(false);
+    }
+  }, [groupId, isOwner]);
+
+  useEffect(() => { fetchGroup(); }, [fetchGroup]);
+  useEffect(() => {
+    if (isMember) {
+      fetchMembers();
+    }
+  }, [isMember, fetchMembers]);
+  useEffect(() => {
+    if (isOwner) fetchJoinRequests();
+  }, [isOwner, fetchJoinRequests]);
+
+  // ——— Actions
+  const handleJoinGroup = async () => {
+    if (!groupId) return;
+    setJoinLoading(true);
+    try {
+      await joinRequestApi(groupId);
+      await fetchGroup();
+    } catch {
+      // silent
+    } finally {
+      setJoinLoading(false);
+    }
+  };
+
+  const handleConfirmLeave = async () => {
+    if (!groupId) return;
+    setLeaveLoading(true);
+    try {
+      await leaveGroupApi(groupId);
+      setShowLeaveModal(false);
+      navigate('/groups');
+    } catch {
+      // silent
+      setLeaveLoading(false);
+    }
+  };
+
+  const handleSendInvite = async (userId: string) => {
+    if (!groupId) return;
+    setInviteLoadingId(userId);
+    setInviteError('');
+    try {
+      await inviteMemberApi(groupId, userId);
+      setInvitedIds(prev => [...prev, userId]);
+    } catch (err: any) {
+      setInviteError(err?.response?.data?.message || 'Gửi lời mời thất bại.');
+    } finally {
+      setInviteLoadingId(null);
+    }
+  };
+
+  const handleMembersChange = () => {
+    fetchMembers();
+    fetchGroup();
+    if (isOwner) fetchJoinRequests();
+  };
+
+  // ——— Loading / Error states
+  if (groupLoading) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="w-10 h-10 text-indigo-400 animate-spin mx-auto mb-4" />
+          <p className="text-sm text-slate-400">Đang tải thông tin nhóm...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (groupError) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="bg-white rounded-2xl border border-rose-100 p-12 text-center max-w-sm mx-4">
+          <AlertCircle className="w-10 h-10 text-rose-400 mx-auto mb-4" />
+          <h3 className="text-base font-bold text-slate-800 mb-2">Không thể tải nhóm</h3>
+          <p className="text-sm text-slate-500 mb-5">{groupError}</p>
+          <div className="flex gap-3 justify-center">
+            <button onClick={fetchGroup} className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-indigo-600 bg-indigo-50 rounded-xl border-0 cursor-pointer hover:bg-indigo-100 transition-all">
+              <RefreshCw className="w-4 h-4" /> Thử lại
+            </button>
+            <button onClick={() => navigate('/groups')} className="px-4 py-2 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl border-0 cursor-pointer transition-all">
+              Quay lại
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!group) return null;
+
+  const coverColor = getCoverColor(group.id);
+
+  return (
+    <div className="min-h-screen bg-slate-50 font-sans">
+      {/* ——— Cover Banner ——— */}
+      <div
+        className={`h-52 md:h-64 relative overflow-hidden bg-gradient-to-br ${coverColor}`}
+      >
+        <div className="absolute inset-0 opacity-10"
+          style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/30" />
+
+        {/* Back button */}
+        <button
+          onClick={() => navigate('/groups')}
+          className="absolute top-5 left-5 md:left-8 flex items-center gap-2 px-3.5 py-2 bg-black/20 hover:bg-black/35 text-white text-sm font-semibold rounded-xl border-0 cursor-pointer transition-all backdrop-blur-sm"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Nhóm của tôi
+        </button>
+
+        {/* Visibility badge */}
+        <div className="absolute top-5 right-5 md:right-8">
+          <span className="flex items-center gap-1.5 px-3 py-1.5 bg-black/20 backdrop-blur-sm text-white text-xs font-semibold rounded-xl">
+            <Globe className="w-3.5 h-3.5" />
+            {group.visibility === 'PUBLIC' ? 'Công khai' : group.visibility === 'PRIVATE' ? 'Riêng tư' : 'Chỉ mời'}
+          </span>
+        </div>
+      </div>
+
+      {/* ——— Header Info ——— */}
+      <div className="bg-white border-b border-slate-200 shadow-sm">
+        <div className="max-w-[1100px] mx-auto px-5 md:px-8">
+          {/* Avatar + Info row */}
+          <div className="flex flex-col sm:flex-row gap-4 relative sm:items-start">
+            {/* Group Avatar */}
+            <div className={`w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br ${coverColor} flex items-center justify-center text-white text-4xl font-black shrink-0 border-4 border-white shadow-xl ring-2 ring-white -mt-10 sm:-mt-14 z-10 overflow-hidden`}>
+              {group.avatarUrl
+                ? <img src={group.avatarUrl} alt={group.name} className="w-full h-full object-cover" />
+                : getInitials(group.name)
+              }
+            </div>
+
+            {/* Group Info */}
+            <div className="flex-1 min-w-0 pt-3 sm:pt-4 pb-3">
+              <div className="flex flex-wrap items-center gap-2 mb-1">
+                <h1 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">{group.name}</h1>
+                {isOwner && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-amber-50 text-amber-700 text-xs font-bold rounded-full border border-amber-200">
+                    <Crown className="w-3 h-3" /> Chủ nhóm
+                  </span>
+                )}
+              </div>
+              {group.description && (
+                <p className="text-sm text-slate-500 line-clamp-2 max-w-xl">{group.description}</p>
+              )}
+              <div className="flex items-center gap-4 mt-2">
+                <span className="flex items-center gap-1.5 text-xs text-slate-500 font-medium">
+                  <Users className="w-3.5 h-3.5 text-slate-400" />
+                  {group.memberCount} thành viên
+                </span>
+              </div>
+            </div>
+
+            {/* Action Buttons */}
+            <div className="flex items-center gap-2 shrink-0 sm:pt-4 sm:pb-3">
+              {isMember ? (
+                <>
+                  {/* Mời Button */}
+                  <button
+                    onClick={() => setShowInviteModal(true)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200"
+                  >
+                    <UserPlus className="w-4 h-4" />
+                    Mời
+                  </button>
+
+                  {/* Đã tham gia Dropdown */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setOpenJoinedDropdown(!openJoinedDropdown)}
+                      className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl border-0 cursor-pointer transition-all"
+                    >
+                      <UserCheck className="w-4 h-4 text-emerald-600" />
+                      Đã tham gia
+                      <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                    </button>
+                    {openJoinedDropdown && (
+                      <>
+                        <div className="fixed inset-0 z-20" onClick={() => setOpenJoinedDropdown(false)} />
+                        <div className="absolute right-0 top-11 z-30 w-44 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden p-1.5">
+                          {isOwner && (
+                            <button
+                              onClick={() => { setActiveTab('settings'); setOpenJoinedDropdown(false); }}
+                              className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 rounded-xl border-0 cursor-pointer transition-all text-left"
+                            >
+                              <Settings className="w-3.5 h-3.5" />
+                              Cài đặt nhóm
+                            </button>
+                          )}
+                          <button
+                            onClick={() => { setOpenJoinedDropdown(false); setShowLeaveModal(true); }}
+                            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl border-0 cursor-pointer transition-all text-left"
+                          >
+                            <LogOut className="w-3.5 h-3.5" />
+                            Rời nhóm
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </>
+              ) : membershipStatus === 'PENDING' ? (
+                /* Đang chờ duyệt Dropdown */
+                <div className="relative">
+                  <button
+                    onClick={() => setOpenPendingDropdown(!openPendingDropdown)}
+                    className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-xl border-0 cursor-pointer transition-all"
+                  >
+                    <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
+                    Đang chờ duyệt
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-500" />
+                  </button>
+                  {openPendingDropdown && (
+                    <>
+                      <div className="fixed inset-0 z-20" onClick={() => setOpenPendingDropdown(false)} />
+                      <div className="absolute right-0 top-11 z-30 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden p-1.5">
+                        <button
+                          onClick={() => { setOpenPendingDropdown(false); /* cancel request */ }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl border-0 cursor-pointer transition-all text-left"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                          Hủy yêu cầu tham gia
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              ) : (
+                /* Tham gia nhóm Button */
+                <button
+                  onClick={handleJoinGroup}
+                  disabled={joinLoading}
+                  className="flex items-center gap-2 px-4 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200"
+                >
+                  {joinLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                  {joinLoading ? 'Đang gửi...' : 'Xin tham gia'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* ——— Tab Navigation ——— */}
+          {(isMember || group.visibility === 'PUBLIC') && (
+            <div className="flex gap-0.5 border-t border-slate-100 -mx-0">
+              {tabs.filter(t => (!t.ownerOnly || isOwner) && (!t.memberOnly || isMember)).map(({ id, label, icon: Icon }) => (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id)}
+                  className={`relative flex items-center gap-2 px-5 py-3.5 text-sm font-semibold transition-all cursor-pointer border-0 outline-none bg-transparent ${
+                    activeTab === id
+                      ? 'text-indigo-600'
+                      : 'text-slate-500 hover:text-slate-700 hover:bg-slate-50'
+                  }`}
+                >
+                  <Icon className="w-4 h-4" />
+                  {label}
+                  {activeTab === id && (
+                    <span className="absolute bottom-0 left-2 right-2 h-[3px] bg-indigo-600 rounded-full" />
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ——— Tab Content / Lock screen ——— */}
+      <div className="max-w-[1100px] mx-auto px-5 md:px-8 py-6">
+        {(!isMember && group.visibility === 'PRIVATE') ? (
+          <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center max-w-xl mx-auto shadow-sm space-y-4">
+            <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto text-indigo-500">
+              <Lock className="w-8 h-8" />
+            </div>
+            <div className="space-y-1.5">
+              <h3 className="text-lg font-bold text-slate-800">
+                {membershipStatus === 'PENDING'
+                  ? 'Yêu cầu đang chờ duyệt'
+                  : 'Nhóm riêng tư'}
+              </h3>
+              <p className="text-sm text-slate-500 leading-relaxed">
+                {membershipStatus === 'PENDING'
+                  ? 'Yêu cầu tham gia của bạn đã được gửi. Chờ chủ nhóm phê duyệt nhé!'
+                  : 'Nội dung thảo luận học tập, tài liệu chia sẻ và danh sách thành viên được ẩn. Hãy gửi yêu cầu tham gia để cùng học tập nhé!'}
+              </p>
+            </div>
+
+            {membershipStatus === 'PENDING' ? (
+              <div className="inline-flex items-center gap-2 px-4 py-2.5 bg-amber-50 text-amber-800 border border-amber-200 text-sm font-medium rounded-xl">
+                <Clock className="w-4 h-4 text-amber-500 animate-pulse" />
+                Đã gửi yêu cầu tham gia nhóm · Chờ phê duyệt
+              </div>
+            ) : (
+              <button
+                onClick={handleJoinGroup}
+                disabled={joinLoading}
+                className="inline-flex items-center gap-2 px-6 py-3 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-70 rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200"
+              >
+                {joinLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
+                {joinLoading ? 'Đang gửi...' : 'Xin tham gia'}
+              </button>
+            )}
+          </div>
+        ) : (
+          <>
+            {activeTab === 'chat' && isMember && <ChatTab group={group} canContribute={canContribute} />}
+            {activeTab === 'members' && (
+              <MembersTab
+                group={group}
+                members={members}
+                membersLoading={membersLoading}
+                joinRequests={joinRequests}
+                joinRequestsLoading={joinRequestsLoading}
+                onMembersChange={handleMembersChange}
+                onInviteClick={() => setShowInviteModal(true)}
+              />
+            )}
+            {activeTab === 'documents' && <DocumentsTab isMember={isMember} canContribute={canContribute} />}
+            {activeTab === 'settings' && isOwner && (
+              <SettingsTab
+                group={group}
+                onGroupUpdated={fetchGroup}
+                onGroupDeleted={() => navigate('/groups')}
+              />
+            )}
+          </>
+        )}
+      </div>
+
+      {/* Leave Group Modal */}
+      {showLeaveModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-slate-800">Rời khỏi nhóm?</h3>
+              <button
+                onClick={() => setShowLeaveModal(false)}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl border-0 bg-transparent cursor-pointer transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-4">
+              <p className="text-sm text-slate-500 leading-relaxed">
+                Bạn có chắc chắn muốn rời khỏi nhóm <strong className="text-slate-700">{group.name}</strong>?
+                Bạn sẽ không thể xem thảo luận nhóm hoặc tài liệu học tập sau khi rời nhóm.
+              </p>
+              <div className="flex gap-3 justify-end">
+                <button
+                  onClick={() => setShowLeaveModal(false)}
+                  className="px-4 py-2.5 text-sm font-semibold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-xl border-0 cursor-pointer transition-all"
+                >
+                  Hủy
+                </button>
+                <button
+                  onClick={handleConfirmLeave}
+                  disabled={leaveLoading}
+                  className="px-4 py-2.5 text-sm font-semibold text-white bg-rose-600 hover:bg-rose-700 disabled:opacity-60 rounded-xl border-0 cursor-pointer transition-all active:scale-95 shadow-md shadow-rose-200 flex items-center gap-2"
+                >
+                  {leaveLoading && <Loader2 className="w-4 h-4 animate-spin" />}
+                  {leaveLoading ? 'Đang rời...' : 'Rời nhóm'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Invite Modal */}
+      {showInviteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-base font-bold text-slate-800">Mời thành viên</h3>
+                <p className="text-xs text-slate-400 mt-0.5">Nhập User ID để gửi lời mời tham gia nhóm</p>
+              </div>
+              <button
+                onClick={() => { setShowInviteModal(false); setInviteError(''); }}
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl border-0 bg-transparent cursor-pointer transition-all"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            <div className="space-y-3">
+              {inviteError && (
+                <div className="flex items-center gap-2 px-4 py-3 bg-rose-50 text-rose-600 rounded-xl text-sm mb-3">
+                  <AlertCircle className="w-4 h-4 shrink-0" />
+                  {inviteError}
+                </div>
+              )}
+              
+              <div className="max-h-80 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
+                {friendsLoading ? (
+                  <div className="py-8 flex justify-center"><Loader2 className="w-6 h-6 animate-spin text-indigo-500" /></div>
+                ) : friendsList?.length === 0 ? (
+                  <div className="py-8 text-center text-slate-400 text-sm">Bạn chưa có bạn bè nào để mời.</div>
+                ) : (
+                  friendsList?.map(friend => {
+                    const isAlreadyMember = members.some(m => m.userId === friend.id);
+                    const isInvited = invitedIds.includes(friend.id);
+                    const isDisabed = isAlreadyMember || isInvited;
+
+                    return (
+                      <div key={friend.id} className="flex items-center justify-between p-3 rounded-xl border border-slate-100 hover:border-slate-200 transition-all">
+                        <div className="flex items-center gap-3">
+                          <AvatarCircle name={friend.name} avatarUrl={friend.avatarUrl ?? undefined} />
+                          <div>
+                            <p className="text-sm font-semibold text-slate-800">{friend.name}</p>
+                            <p className="text-xs text-slate-400">{friend.email}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleSendInvite(friend.id)}
+                          disabled={isDisabed || inviteLoadingId === friend.id}
+                          className={`px-3 py-1.5 text-xs font-semibold rounded-lg border-0 transition-all cursor-pointer outline-none active:scale-95 ${
+                            isAlreadyMember ? 'bg-slate-100 text-slate-400 cursor-not-allowed active:scale-100' :
+                            isInvited ? 'bg-emerald-50 text-emerald-600 cursor-not-allowed active:scale-100' :
+                            'bg-indigo-50 text-indigo-600 hover:bg-indigo-100'
+                          }`}
+                        >
+                          {inviteLoadingId === friend.id ? <Loader2 className="w-4 h-4 animate-spin" /> : 
+                           isAlreadyMember ? 'Đã tham gia' :
+                           isInvited ? 'Đã gửi lời mời' : 'Mời'}
+                        </button>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default GroupWorkspacePage;

@@ -10,12 +10,16 @@ export const findGroupByKeyword = async (keyword: string) => {
         { description: { contains: keyword, mode: "insensitive" } }
       ],
       visibility: {
-        in: ["PUBLIC", "INVITE"]
+        in: ["PUBLIC", "PRIVATE"] // INVITE is hidden, PRIVATE is visible but cannot be joined easily
       },
       isActive: true,
       isDeleted: false
+    },
+    include: {
+      _count: {
+        select: { members: true }
+      }
     }
-
   })
 }
 
@@ -53,17 +57,37 @@ export const getMyListGroup = async (myId: string, keyword?: string) => {
             { description: { contains: keyword, mode: "insensitive" } }
           ]
         } : {})
+    },
+    include: {
+      _count: {
+        select: { members: true }
+      },
+      members: {
+        where: { userId: myId },
+        select: { role: true }
+      }
     }
   })
 }
 
 
-export const findGroupById = async (groupId: string) => {
+export const findGroupById = async (groupId: string, myId?: string) => {
   return prisma.group.findFirst({
     where: {
       id: groupId,
       isDeleted: false,
       isActive: true
+    },
+    include: {
+      _count: {
+        select: { members: true }
+      },
+      ...(myId ? {
+        members: {
+          where: { userId: myId },
+          select: { role: true }
+        }
+      } : {})
     }
   })
 }
@@ -209,9 +233,18 @@ export const getInvitationByStatusAndType = async (groupId: string, type: Invita
       groupId: groupId,
       status,
       type
+    },
+    include: {
+      user: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          avatarUrl: true
+        }
+      }
     }
-  }
-  )
+  })
 }
 
 export const getInvitationByInviteId  = async(groupId: string,inviteId:string)=>{

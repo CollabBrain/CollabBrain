@@ -11,6 +11,7 @@ app.use("/user", userRoutes)
 app.use("/friends", friendRoutes)
 
 app.use("/groups",groupRoutes)
+app.use("/user/groups", groupRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
 
 app.use("/chat", chatRoutes)
 app.use("/user/chat", chatRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
