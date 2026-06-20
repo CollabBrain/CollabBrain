@@ -59,7 +59,7 @@ const AdminReportsPage = () => {
     }
     setTogglingUserId(userId);
     try {
-      await adminAxiosInstance.patch(`/${userId}/toggle-status`);
+      await adminAxiosInstance.patch(`/users/${userId}/toggle-status`);
       showToast(
         currentStatus ? 'Đã khóa tài khoản thành công' : 'Đã mở khóa tài khoản thành công',
         'success'

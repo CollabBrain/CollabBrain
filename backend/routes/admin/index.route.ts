@@ -9,11 +9,11 @@ import pathAdmin from "../../config/system";
 
 const adminRoutes = (app: Application) => {
   app.use(pathAdmin, authRoutes);
-  app.use(pathAdmin, userRoutes);
-  app.use(pathAdmin, accountRoutes);
-  app.use(pathAdmin, groupRoutes);
-  app.use(pathAdmin, statsRoutes);
-  app.use(pathAdmin, reportRoutes);
+  app.use(pathAdmin + "/users", userRoutes);
+  app.use(pathAdmin + "/accounts", accountRoutes);
+  app.use(pathAdmin + "/groups", groupRoutes);
+  app.use(pathAdmin + "/stats", statsRoutes);
+  app.use(pathAdmin + "/reports", reportRoutes);
 };
 
 export default adminRoutes;
