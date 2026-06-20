@@ -1,9 +1,11 @@
 import { lazy, Suspense } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { ROUTES } from '../constants';
 import { useAuthStore, useHasHydrated } from '../store/useAuthStore';
+import { useAdminAuthStore, useHasAdminHydrated } from '../store/useAdminAuthStore';
 import AuthLayout from '../layouts/AuthLayout';
 import MainLayout from '../layouts/MainLayout';
+import AdminLayout from '../layouts/AdminLayout';
 
 // Lazy load pages
 const LoginPage = lazy(() => import('../pages/LoginPage'));
@@ -23,6 +25,13 @@ const FriendRequestsPage = lazy(() => import('../pages/FriendRequestsPage').then
 const SuggestionsPage = lazy(() => import('../pages/SuggestionsPage').then(module => ({ default: module.SuggestionsPage })));
 const BlockedListPage = lazy(() => import('../pages/BlockedListPage').then(module => ({ default: module.BlockedListPage })));
 const UserProfilePage = lazy(() => import('../pages/UserProfilePage').then(module => ({ default: module.UserProfilePage })));
+
+// Lazy load admin pages
+const AdminLoginPage = lazy(() => import('../pages/admin/AdminLoginPage'));
+const AdminStatsPage = lazy(() => import('../pages/admin/AdminStatsPage'));
+const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
+const AdminGroupsPage = lazy(() => import('../pages/admin/AdminGroupsPage'));
+const AdminReportsPage = lazy(() => import('../pages/admin/AdminReportsPage'));
 
 // Spinner toàn màn hình khi đang lazy-load hoặc đợi hydration
 const PageSpinner = () => (
@@ -55,11 +64,31 @@ const GuestRoute = ({ children }: { children: React.ReactNode }) => {
   return !isAuthenticated ? <>{children}</> : <Navigate to={ROUTES.DASHBOARD} replace />;
 };
 
+// Route bảo vệ Admin — đợi hydration xong mới check auth
+const AdminPrivateRoute = ({ children }: { children: React.ReactNode }) => {
+  const isAuthenticated = useAdminAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useHasAdminHydrated();
+
+  if (!hasHydrated) return <PageSpinner />;
+
+  return isAuthenticated ? <>{children}</> : <Navigate to="/admin/login" replace />;
+};
+
+// Route chỉ dành cho khách Admin (chưa đăng nhập) — đợi hydration xong
+const AdminGuestRoute = ({ children }: { children: React.ReactNode }) => {
+  const isAuthenticated = useAdminAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useHasAdminHydrated();
+
+  if (!hasHydrated) return <PageSpinner />;
+
+  return !isAuthenticated ? <>{children}</> : <Navigate to="/admin/dashboard" replace />;
+};
+
 export const AppRouter = () => {
   return (
     <Suspense fallback={<PageSpinner />}>
       <Routes>
-        {/* ——— Auth routes (khách, chưa đăng nhập) */}
+        {/* ——— Client Auth routes (khách, chưa đăng nhập) */}
         <Route
           element={
             <GuestRoute>
@@ -72,7 +101,7 @@ export const AppRouter = () => {
           <Route path={ROUTES.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
         </Route>
 
-        {/* ——— Protected routes (cần đăng nhập) */}
+        {/* ——— Client Protected routes (cần đăng nhập) */}
         <Route
           element={
             <PrivateRoute>
@@ -92,6 +121,32 @@ export const AppRouter = () => {
           <Route path="/friends/suggestions" element={<SuggestionsPage />} />
           <Route path="/friends/blocked" element={<BlockedListPage />} />
           <Route path="/users/:id" element={<UserProfilePage />} />
+        </Route>
+
+        {/* ——— Admin Guest routes */}
+        <Route
+          element={
+            <AdminGuestRoute>
+              <Outlet />
+            </AdminGuestRoute>
+          }
+        >
+          <Route path="/admin/login" element={<AdminLoginPage />} />
+        </Route>
+
+        {/* ——— Admin Protected routes */}
+        <Route
+          element={
+            <AdminPrivateRoute>
+              <AdminLayout />
+            </AdminPrivateRoute>
+          }
+        >
+          <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
+          <Route path="/admin/dashboard" element={<AdminStatsPage />} />
+          <Route path="/admin/users" element={<AdminUsersPage />} />
+          <Route path="/admin/groups" element={<AdminGroupsPage />} />
+          <Route path="/admin/reports" element={<AdminReportsPage />} />
         </Route>
 
         {/* ——— Public Landing Page */}

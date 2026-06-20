@@ -196,15 +196,33 @@ export const useRecallMessage = () => {
     mutationFn: (messageId: string) => recallMessageApi(messageId),
     onSuccess: (_, messageId) => {
       useChatStore.setState((state) => {
-        const updated: Record<string, Message[]> = {};
+        const updatedMsgs: Record<string, Message[]> = {};
         for (const [convId, msgs] of Object.entries(state.messagesByConversation)) {
-          updated[convId] = msgs.map((m) =>
+          updatedMsgs[convId] = msgs.map((m) =>
             m.id === messageId
               ? { ...m, content: '🚫 Tin nhắn đã được thu hồi', type: 'text' as const }
               : m
           );
         }
-        return { messagesByConversation: updated };
+
+        const updatedConvs = state.conversations.map((c) => {
+          if (c.lastMessage?.id === messageId) {
+            return {
+              ...c,
+              lastMessage: {
+                ...c.lastMessage,
+                content: '🚫 Tin nhắn đã được thu hồi',
+                type: 'text' as const,
+              },
+            };
+          }
+          return c;
+        });
+
+        return {
+          messagesByConversation: updatedMsgs,
+          conversations: updatedConvs,
+        };
       });
     },
   });
@@ -216,11 +234,27 @@ export const useDeleteMessage = () => {
     mutationFn: (messageId: string) => deleteMessageApi(messageId),
     onSuccess: (_, messageId) => {
       useChatStore.setState((state) => {
-        const updated: Record<string, Message[]> = {};
+        const updatedMsgs: Record<string, Message[]> = {};
         for (const [convId, msgs] of Object.entries(state.messagesByConversation)) {
-          updated[convId] = msgs.filter((m) => m.id !== messageId);
+          updatedMsgs[convId] = msgs.filter((m) => m.id !== messageId);
         }
-        return { messagesByConversation: updated };
+
+        const updatedConvs = state.conversations.map((c) => {
+          if (c.lastMessage?.id === messageId) {
+            const convMsgs = updatedMsgs[c.id] || [];
+            const newLastMsg = convMsgs.length > 0 ? convMsgs[convMsgs.length - 1] : null;
+            return {
+              ...c,
+              lastMessage: newLastMsg,
+            };
+          }
+          return c;
+        });
+
+        return {
+          messagesByConversation: updatedMsgs,
+          conversations: updatedConvs,
+        };
       });
     },
   });
@@ -265,15 +299,23 @@ export const useChatSocket = () => {
       addMessage(message);
       const conv = conversationsRef.current.find((c) => c.id === message.conversationId);
       if (conv) {
+        let myId = '';
+        if (accessToken) {
+          try {
+            const payload = JSON.parse(atob(accessToken.split('.')[1]));
+            myId = payload.id ?? payload.sub ?? payload.userId ?? '';
+          } catch {}
+        }
+        const isFromMe = message.senderId === myId;
         addOrUpdate({
           ...conv,
           lastMessage: message,
           updatedAt: message.createdAt,
-          unreadCount: conv.unreadCount + 1,
+          unreadCount: isFromMe ? conv.unreadCount : conv.unreadCount + 1,
         });
       }
     },
-    [addMessage, addOrUpdate]
+    [addMessage, addOrUpdate, accessToken]
   );
 
   const handleTyping = useCallback(
@@ -290,6 +332,55 @@ export const useChatSocket = () => {
     [setOnlineStatus]
   );
 
+  const handleMessageRecalled = useCallback(
+    ({ messageId, conversationId }: { messageId: string; conversationId: string }) => {
+      useChatStore.setState((state) => {
+        const msgs = state.messagesByConversation[conversationId] ?? [];
+        const updated = msgs.map((m) =>
+          m.id === messageId
+            ? { ...m, content: '🚫 Tin nhắn đã được thu hồi', type: 'text' as const }
+            : m
+        );
+        return {
+          messagesByConversation: {
+            ...state.messagesByConversation,
+            [conversationId]: updated,
+          },
+        };
+      });
+
+      const convs = useChatStore.getState().conversations;
+      const conv = convs.find((c) => c.id === conversationId);
+      if (conv && conv.lastMessage?.id === messageId) {
+        addOrUpdate({
+          ...conv,
+          lastMessage: {
+            ...conv.lastMessage,
+            content: '🚫 Tin nhắn đã được thu hồi',
+            type: 'text' as const,
+          },
+        });
+      }
+    },
+    [addOrUpdate]
+  );
+
+  const handleMessageDeleted = useCallback(
+    ({ messageId, conversationId }: { messageId: string; conversationId: string }) => {
+      useChatStore.setState((state) => {
+        const msgs = state.messagesByConversation[conversationId] ?? [];
+        const updated = msgs.filter((m) => m.id !== messageId);
+        return {
+          messagesByConversation: {
+            ...state.messagesByConversation,
+            [conversationId]: updated,
+          },
+        };
+      });
+    },
+    []
+  );
+
   useEffect(() => {
     if (!accessToken) return;
     const socket = getSocket();
@@ -298,13 +389,17 @@ export const useChatSocket = () => {
     socket.on('chat:new_message', handleNewMessage);
     socket.on('chat:typing', handleTyping);
     socket.on('user:online_status', handleOnlineStatus);
+    socket.on('chat:message_recalled', handleMessageRecalled);
+    socket.on('chat:message_deleted', handleMessageDeleted);
 
     return () => {
       socket.off('chat:new_message', handleNewMessage);
       socket.off('chat:typing', handleTyping);
       socket.off('user:online_status', handleOnlineStatus);
+      socket.off('chat:message_recalled', handleMessageRecalled);
+      socket.off('chat:message_deleted', handleMessageDeleted);
     };
-  }, [accessToken, handleNewMessage, handleTyping, handleOnlineStatus]);
+  }, [accessToken, handleNewMessage, handleTyping, handleOnlineStatus, handleMessageRecalled, handleMessageDeleted]);
 };
 
 // ========== Emit helpers ==========

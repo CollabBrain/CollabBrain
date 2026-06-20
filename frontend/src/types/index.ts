@@ -4,6 +4,7 @@ export interface User {
   email: string;
   name: string;
   avatarUrl: string | null;
+  coverUrl: string | null;
   bio: string | null;
   isActive: boolean;
   isDeleted: boolean;
@@ -49,6 +50,7 @@ export interface ResetPasswordPayload {
 export interface EditProfilePayload {
   name?: string;
   avatarUrl?: string;
+  coverUrl?: string;
   bio?: string;
 }
 

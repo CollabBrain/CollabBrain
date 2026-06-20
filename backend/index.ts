@@ -12,6 +12,7 @@ import { chatSocket } from './sockets/chat.socket';
 import cookieParser from 'cookie-parser';
 
 const app: Express = express();
+
 const server = http.createServer(app)
 
 const PORT = process.env.PORT || 3000;

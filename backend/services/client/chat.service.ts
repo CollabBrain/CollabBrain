@@ -43,6 +43,8 @@ export const markReadService = async(myId:string, targetId: string) => {
   
 }
 
+import prisma from "../../config/prisma";
+
 export const deleteMessageService = async(myId: string, messageId: string)=>{
   const message = await findMessageById(messageId)
   if(!message) throw new Error("Không tồn tại tin nhắn")
@@ -55,6 +57,28 @@ export const deleteMessageService = async(myId: string, messageId: string)=>{
   return{
     message: "Xóa tin nhắn thành công"
   }
+}
+
+export const recallMessageService = async (myId: string, messageId: string) => {
+  const message = await findMessageById(messageId);
+  if (!message) throw new Error("Không tồn tại tin nhắn");
+  
+  if (message.senderId !== myId) {
+    throw new Error("Bạn không có quyền thu hồi tin nhắn này");
+  }
+
+  const updatedMessage = await prisma.message.update({
+    where: { id: messageId },
+    data: {
+      content: "🚫 Tin nhắn đã được thu hồi",
+      type: "TEXT"
+    }
+  });
+
+  return {
+    message: "Thu hồi tin nhắn thành công",
+    data: updatedMessage
+  };
 }
 
 

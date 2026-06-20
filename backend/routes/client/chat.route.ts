@@ -22,6 +22,7 @@ router.post("/messages", ratelimit.authIpLimiter, middleware.authMiddleware, con
 router.get("/history/:userId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.getHistory)
 router.patch("/read/:userId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.markedReadPatch)
 router.patch("/delete/:messageId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.deleteMessagePatch)
+router.delete("/messages/:messageId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.deleteMessage)
 
 router.post("/upload",ratelimit.authIpLimiter,middleware.authMiddleware,upload.single("file"),controller.uploadFilePost)
 

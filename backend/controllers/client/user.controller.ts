@@ -228,6 +228,7 @@ export const userProfileById = async (req: Request, res: Response) => {
         name: true,
         email: true,
         avatarUrl: true,
+        coverUrl: true,
         bio: true,
         createdAt: true,
       },
