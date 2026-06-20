@@ -37,7 +37,7 @@ export const findGroups = async (
   }
 
   if (typeof isPublic === "boolean") {
-    where.isPublic = isPublic;
+    where.visibility = isPublic ? "PUBLIC" : { not: "PUBLIC" };
   }
 
   const [groups, total] = await Promise.all([
@@ -47,13 +47,13 @@ export const findGroups = async (
         id: true,
         name: true,
         description: true,
-        isPublic: true,
+        visibility: true,
+        avatarUrl: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
         _count: {
           select: {
-            posts: true,
             members: true,
             documents: true
           }
@@ -81,7 +81,7 @@ export const findGroupById = async (id: string) => {
       id: true,
       name: true,
       description: true,
-      isPublic: true,
+      visibility: true,
       isActive: true,
       avatarUrl: true,
       createdAt: true,
@@ -98,18 +98,8 @@ export const findGroupById = async (id: string) => {
           }
         }
       },
-      posts: {
-        select: {
-          id: true,
-          content: true,
-          createdAt: true
-        },
-        take: 5,
-        orderBy: { createdAt: "desc" }
-      },
       _count: {
         select: {
-          posts: true,
           members: true,
           documents: true
         }

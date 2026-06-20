@@ -45,7 +45,7 @@ const AdminUsersPage = () => {
     setLoading(true);
     try {
       const activeParam = statusFilter === 'active' ? 'true' : statusFilter === 'locked' ? 'false' : undefined;
-      const response = await adminAxiosInstance.get('/', {
+      const response = await adminAxiosInstance.get('/users', {
         params: {
           page,
           limit: 8,
@@ -98,7 +98,7 @@ const AdminUsersPage = () => {
 
     setEditSaving(true);
     try {
-      await adminAxiosInstance.patch(`/${editingUser.id}`, {
+      await adminAxiosInstance.patch(`/users/${editingUser.id}`, {
         name: editName.trim(),
         bio: editBio.trim() || null,
       });
@@ -115,7 +115,7 @@ const AdminUsersPage = () => {
 
   const handleToggleStatus = async (userId: string) => {
     try {
-      const response = await adminAxiosInstance.patch(`/${userId}/toggle-status`);
+      const response = await adminAxiosInstance.patch(`/users/${userId}/toggle-status`);
       showToast(response.data.message || 'Thay đổi trạng thái tài khoản thành công', 'success');
       fetchUsers();
     } catch (err: any) {
@@ -128,7 +128,7 @@ const AdminUsersPage = () => {
 
   const handleDeleteUser = async (userId: string) => {
     try {
-      await adminAxiosInstance.delete(`/${userId}`);
+      await adminAxiosInstance.delete(`/users/${userId}`);
       showToast('Xóa người dùng thành công', 'success');
       fetchUsers();
     } catch (err: any) {

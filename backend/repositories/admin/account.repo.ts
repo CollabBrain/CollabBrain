@@ -1,3 +1,4 @@
+import { AccountRole } from "@prisma/client";
 import prisma from "../../config/prisma";
 
 export interface AccountFilters {
@@ -105,7 +106,7 @@ export const countAccounts = async (filters: AccountFilters) => {
 
 export const updateAccount = async (
   id: string,
-  data: { username?: string; role?: string }
+  data: { username?: string; role?: AccountRole }
 ) => {
   return prisma.account.update({
     where: { id },

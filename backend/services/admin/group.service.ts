@@ -28,12 +28,11 @@ export const getGroups = async (query: GetGroupsQuery) => {
     id: group.id,
     name: group.name,
     description: group.description,
-    isPublic: group.isPublic,
+    isPublic: group.visibility === "PUBLIC",
     isActive: group.isActive,
     avatarUrl: group.avatarUrl,
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
-    postCount: group._count.posts,
     memberCount: group._count.members,
     documentCount: group._count.documents
   }));
@@ -59,16 +58,14 @@ export const getGroupById = async (id: string) => {
     id: group.id,
     name: group.name,
     description: group.description,
-    isPublic: group.isPublic,
+    isPublic: group.visibility === "PUBLIC",
     isActive: group.isActive,
     avatarUrl: group.avatarUrl,
     createdAt: group.createdAt,
     updatedAt: group.updatedAt,
-    postCount: group._count.posts,
     memberCount: group._count.members,
     documentCount: group._count.documents,
-    members: group.members.map(m => m.user),
-    recentPosts: group.posts
+    members: group.members.map(m => m.user)
   };
 };
 
