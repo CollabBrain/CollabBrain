@@ -63,8 +63,8 @@ export const FriendRequestsPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {requests.map((request) => (
-            <RequestCard key={request.id} request={request} type={activeTab} />
+          {requests.map((request: any) => (
+            <RequestCard key={request.senderId ?? request.receiverId} request={request} type={activeTab} />
           ))}
         </div>
       )}

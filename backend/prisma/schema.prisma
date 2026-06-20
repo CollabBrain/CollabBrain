@@ -73,6 +73,7 @@ model User {
   passwordHash String     @map("password_hash")
   name      String
   avatarUrl String?       @map("avatar_url")
+  coverUrl  String?       @map("cover_url")
   bio       String?
   isActive  Boolean       @default(true) @map("is_active")
   isDeleted Boolean       @default(false) @map("is_deleted")
@@ -86,6 +87,8 @@ model User {
   sentInvitations     GroupInvitation[]  @relation("InvitationSender")
   sentMessages        Message[]         @relation("SentMessages")
   receivedMessages    Message[]         @relation("ReceivedMessages")
+  reportsSent         Report[]          @relation("Reporter")
+  reportsReceived     Report[]          @relation("ReportedUser")
   @@map("users")
 }
 
@@ -103,6 +106,7 @@ model Group {
   documents   Document[]
   invitations GroupInvitation[]
   messages    Message[]
+  reports     Report[]
   @@map("groups")
 }
 
@@ -202,4 +206,26 @@ model Message {
   @@index([receiverId, createdAt])  // query chat 1-1 nhanh
   @@index([groupId, createdAt])     // query chat group nhanh
   @@map("messages")
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+}
+
+model Report {
+  id            String       @id @default(uuid())
+  reporterId    String       @map("reporter_id")
+  targetUserId  String?      @map("target_user_id")
+  targetGroupId String?      @map("target_group_id")
+  reason        String
+  status        ReportStatus @default(PENDING)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  reporter      User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUser    User?        @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetGroup   Group?       @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
 }

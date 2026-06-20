@@ -2,6 +2,7 @@ import prisma from "../../config/prisma";
 
 export interface GroupFilters {
   search?: string;
+  isActive?: boolean;
   isPublic?: boolean;
   sortBy?: string;
   order?: "asc" | "desc";
@@ -16,17 +17,23 @@ export const findGroups = async (
   filters: GroupFilters,
   pagination: PaginationParams
 ) => {
-  const { search, isPublic, sortBy = "createdAt", order = "desc" } = filters;
+  const { search, isActive, isPublic, sortBy = "createdAt", order = "desc" } = filters;
   const { page, limit } = pagination;
   const skip = (page - 1) * limit;
 
-  const where: any = {};
+  const where: any = {
+    isDeleted: false
+  };
 
   if (search) {
     where.OR = [
       { name: { contains: search, mode: "insensitive" } },
       { description: { contains: search, mode: "insensitive" } }
     ];
+  }
+
+  if (typeof isActive === "boolean") {
+    where.isActive = isActive;
   }
 
   if (typeof isPublic === "boolean") {
@@ -41,12 +48,14 @@ export const findGroups = async (
         name: true,
         description: true,
         isPublic: true,
+        isActive: true,
         createdAt: true,
         updatedAt: true,
         _count: {
           select: {
             posts: true,
-            members: true
+            members: true,
+            documents: true
           }
         }
       },
@@ -63,15 +72,32 @@ export const findGroups = async (
 };
 
 export const findGroupById = async (id: string) => {
-  return prisma.group.findUnique({
-    where: { id },
+  return prisma.group.findFirst({
+    where: {
+      id,
+      isDeleted: false
+    },
     select: {
       id: true,
       name: true,
       description: true,
       isPublic: true,
+      isActive: true,
+      avatarUrl: true,
       createdAt: true,
       updatedAt: true,
+      members: {
+        include: {
+          user: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              avatarUrl: true
+            }
+          }
+        }
+      },
       posts: {
         select: {
           id: true,
@@ -84,39 +110,34 @@ export const findGroupById = async (id: string) => {
       _count: {
         select: {
           posts: true,
-          members: true
+          members: true,
+          documents: true
         }
       }
     }
   });
 };
 
-export const deleteGroup = async (id: string) => {
-  return prisma.group.delete({
+export const toggleGroupStatus = async (id: string, isActive: boolean) => {
+  return prisma.group.update({
     where: { id },
+    data: { isActive },
     select: {
       id: true,
       name: true,
-      deletedAt: true
+      isActive: true
     }
   });
 };
 
-export const countGroups = async (filters: GroupFilters) => {
-  const { search, isPublic } = filters;
-
-  const where: any = {};
-
-  if (search) {
-    where.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { description: { contains: search, mode: "insensitive" } }
-    ];
-  }
-
-  if (typeof isPublic === "boolean") {
-    where.isPublic = isPublic;
-  }
-
-  return prisma.group.count({ where });
+export const deleteGroup = async (id: string) => {
+  return prisma.group.update({
+    where: { id },
+    data: { isDeleted: true },
+    select: {
+      id: true,
+      name: true,
+      isDeleted: true
+    }
+  });
 };

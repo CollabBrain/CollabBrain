@@ -34,6 +34,24 @@ export const getGroupById = async (req: Request, res: Response) => {
   }
 };
 
+export const toggleGroupStatus = async (req: Request, res: Response) => {
+  try {
+    const id = req.params.id as string;
+    const result = await groupService.toggleGroupStatus(id);
+    res.status(200).json({
+      success: true,
+      message: result.isActive ? "Mở khóa nhóm thành công" : "Khóa nhóm thành công",
+      data: result
+    });
+  } catch (error: any) {
+    const statusCode = error.message === "Nhóm không tồn tại" ? 404 : 400;
+    res.status(statusCode).json({
+      success: false,
+      message: error.message
+    });
+  }
+};
+
 export const deleteGroup = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;

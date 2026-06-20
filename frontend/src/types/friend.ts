@@ -1,20 +1,30 @@
+/** User object — matches backend getListFriend / getSuggestFriend raw SQL output */
 export interface User {
   id: string;
   name: string;
-  avatarUrl?: string;
+  email?: string;
+  avatarUrl?: string | null;
+  bio?: string | null;
   status?: "online" | "offline" | "busy";
+  friendshipStatus?: "PENDING" | "ACCEPTED" | "BLOCKED" | null;
+  isSender?: boolean;
 }
 
+/** Friend request — matches backend getRequestedFriend / getSentFriend Prisma output */
 export interface FriendRequest {
-  id: string;
+  id: string; // composite key, use senderId for actions
+  senderId: string;
+  receiverId: string;
   sender: User;
   receiver: User;
-  status: "pending" | "accepted" | "rejected";
+  status: "pending" | "accepted" | "rejected" | "PENDING" | "ACCEPTED" | "BLOCKED";
   createdAt: string;
+  updatedAt?: string;
 }
 
+/** Friend suggestion — matches backend getSuggestFriend raw SQL output */
 export interface FriendSuggestion {
-  id: string; // The user's ID
+  id: string;
   user: User;
   mutualFriendsCount: number;
 }

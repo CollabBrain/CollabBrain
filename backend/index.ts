@@ -9,8 +9,10 @@ import http from "http";
 
 import { socketAuthMiddleware } from "./middlewares/client/socket.middleware";
 import { chatSocket } from './sockets/chat.socket';
+import cookieParser from 'cookie-parser';
 
 const app: Express = express();
+
 const server = http.createServer(app)
 
 const PORT = process.env.PORT || 3000;
@@ -35,6 +37,7 @@ app.use(
   })
 );
 app.set("io",io)
+app.use(cookieParser()); 
 
 io.use(socketAuthMiddleware)
 app.use(express.json());

@@ -9,7 +9,11 @@ router.post("/login",ratelimit.authIpLimiter,validate.loginPost,ratelimit.loginE
 router.post("/register",ratelimit.authIpLimiter,validate.registerPost, ratelimit.registerEmailLimiter,controller.registerPost)
 router.post("/register/verify-otp",ratelimit.authIpLimiter,validate.verifyOtpRegisterPost,ratelimit.verifyOtpEmailLimiter,controller.verifyOtpRegisterPost)
 
+// Refresh token endpoint
+router.post("/refresh", controller.refreshTokenPost)
+
 router.get("/profile",authMiddleware.authMiddleware,controller.userProfile)
+router.get("/profile/:id",authMiddleware.authMiddleware,controller.userProfileById)
 router.patch("/profile", authMiddleware.authMiddleware,controller.editProfile)
 router.post("/forgot-password/forgot",ratelimit.authIpLimiter,validate.forgotPasswordPost,ratelimit.forgotPasswordEmailLimiter,controller.forgotPasswordPost)
 router.post("/forgot-password/otp", ratelimit.authIpLimiter,validate.verifyOTPPost, ratelimit.verifyOtpEmailLimiter,controller.verifyOTPPost)

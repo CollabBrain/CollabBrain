@@ -47,7 +47,7 @@ export const BlockedListPage: React.FC = () => {
         </div>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-          {blockedUsers.map((user) => (
+          {blockedUsers.map((user: any) => (
             <BlockedUserCard key={user.id} user={user} />
           ))}
         </div>

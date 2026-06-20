@@ -18,4 +18,6 @@ export const ROUTES = {
   DASHBOARD: '/dashboard',
   PROFILE: '/profile',
   CHAT: '/chat',
+  DOCUMENTS: '/documents',
+  GROUPS: '/groups',
 } as const;

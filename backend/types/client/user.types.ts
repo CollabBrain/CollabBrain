@@ -5,6 +5,7 @@ export interface Register{
   name: string
 }
 
+
 export interface VerifyOTPRegister extends Register{
   otp: string
 }
@@ -20,5 +21,6 @@ export interface ResetPassword extends VerifyOTP{
 export interface UserTypes {
   name?: string,
   avatarUrl?: string,
+  coverUrl?: string,
   bio?: string
 }
