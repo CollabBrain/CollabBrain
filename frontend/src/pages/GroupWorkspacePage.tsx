@@ -6,7 +6,15 @@ import {
   UserPlus, Search, Eye, Trash2, Globe, Lock, UserCheck,
   BookOpen, FileText, CheckCircle, X, Bell, Upload, GraduationCap,
   Hash, ClipboardList, ChevronDown, Clock, Loader2, AlertCircle, RefreshCw,
+  MoreVertical, Download, Image as ImageIcon, File as FileIcon, CheckCircle2, FileSpreadsheet, FileIcon as FilePowerpoint
 } from 'lucide-react';
+import {
+  uploadGroupDocumentApi,
+  getGroupDocumentsApi,
+  softDeleteDocumentApi,
+  downloadDocumentApi,
+} from '../features/group/services/document.service';
+import type { DocumentData } from '../features/group/services/document.service';
 import {
   getGroupInfoApi,
   getGroupMembersApi,
@@ -346,47 +354,272 @@ const MembersTab = ({
 };
 
 // ——— Tab: Documents
-const DocumentsTab = ({ isMember, canContribute }: { isMember: boolean; canContribute: boolean }) => (
-  <div className="space-y-5">
-    <div className="flex items-center justify-between">
-      <div>
-        <h2 className="text-base font-bold text-slate-800">Tài liệu học tập</h2>
-        <p className="text-xs text-slate-400 mt-0.5">Chia sẻ tài liệu, bài tập và ghi chú với nhóm</p>
+const DocumentsTab = ({ group, isMember, canContribute, isOwner }: { group: GroupWithRole; isMember: boolean; canContribute: boolean; isOwner: boolean }) => {
+  const [documents, setDocuments] = useState<DocumentData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [search, setSearch] = useState('');
+  const [typeFilter, setTypeFilter] = useState<string>('all');
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  const fetchDocuments = useCallback(async () => {
+    if (!group.id || !isMember) return;
+    setLoading(true);
+    try {
+      const res = await getGroupDocumentsApi(group.id, {
+        search: search || undefined,
+        type: typeFilter !== 'all' ? typeFilter : undefined
+      });
+      setDocuments(res.data?.data || []);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [group.id, isMember, search, typeFilter]);
+
+  useEffect(() => {
+    fetchDocuments();
+  }, [fetchDocuments]);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !group.id) return;
+    
+    // Check size limit (30MB)
+    if (file.size > 30 * 1024 * 1024) {
+      alert("Kích thước file không được vượt quá 30MB");
+      return;
+    }
+
+    setUploading(true);
+    setUploadProgress(0);
+    try {
+      await uploadGroupDocumentApi(group.id, file, (progress) => {
+        setUploadProgress(progress);
+      });
+      fetchDocuments();
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Upload thất bại");
+    } finally {
+      setUploading(false);
+      setUploadProgress(0);
+      e.target.value = ''; // reset
+    }
+  };
+
+  const handleDelete = async (docId: string) => {
+    if (!window.confirm("Bạn có chắc muốn xóa tài liệu này?")) return;
+    try {
+      await softDeleteDocumentApi(docId);
+      setDocuments(prev => prev.filter(d => d.id !== docId));
+    } catch (err: any) {
+      alert(err?.response?.data?.message || "Xóa thất bại");
+    }
+  };
+
+  const getFileIcon = (type: string) => {
+    switch (type) {
+      case 'PDF': return <FileText className="w-5 h-5" />;
+      case 'DOCX': return <FileIcon className="w-5 h-5" />;
+      case 'PPTX': return <FilePowerpoint className="w-5 h-5" />;
+      case 'XLSX': return <FileSpreadsheet className="w-5 h-5" />;
+      case 'IMAGE': return <ImageIcon className="w-5 h-5" />;
+      default: return <FileText className="w-5 h-5" />;
+    }
+  };
+
+  const getFileColor = (type: string) => {
+    switch (type) {
+      case 'PDF': return 'bg-rose-50 text-rose-600';
+      case 'DOCX': return 'bg-blue-50 text-blue-600';
+      case 'PPTX': return 'bg-orange-50 text-orange-600';
+      case 'XLSX': return 'bg-emerald-50 text-emerald-600';
+      case 'IMAGE': return 'bg-purple-50 text-purple-600';
+      default: return 'bg-slate-50 text-slate-600';
+    }
+  };
+
+  const formatSize = (bytes: number | null) => {
+    if (!bytes) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
+
+  const handleDownload = async (docId: string, url: string, filename: string) => {
+    try {
+      const response = await downloadDocumentApi(docId);
+      const blob = new Blob([response.data as any]);
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error("Download proxy failed, using fallback", error);
+      if (url.includes('/image/upload/') && filename.toLowerCase().endsWith('.pdf')) {
+        alert("⚠️ CẢNH BÁO: File PDF này là dữ liệu cũ bị lưu sai định dạng. Server Cloud đã chặn quyền truy cập.\n\n👉 GIẢI PHÁP: Bạn vui lòng XÓA file này đi và TẢI LÊN LẠI file PDF đó nhé!");
+        return;
+      }
+      const fallbackUrl = url.includes('/upload/') 
+        ? url.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(filename)}/`)
+        : url;
+      window.open(fallbackUrl, '_blank');
+    }
+  };
+
+  const handlePreview = async (e: React.MouseEvent, docId: string, url: string, type: string) => {
+    e.preventDefault();
+    if (type === 'PDF') {
+      try {
+        const response = await downloadDocumentApi(docId);
+        const blob = new Blob([response.data as any], { type: 'application/pdf' });
+        const blobUrl = window.URL.createObjectURL(blob);
+        window.open(blobUrl, '_blank');
+      } catch (error) {
+        console.error("Preview proxy failed, using fallback", error);
+        if (url.includes('/image/upload/')) {
+          alert("⚠️ CẢNH BÁO: File PDF này là dữ liệu cũ bị lưu sai định dạng. Server Cloud đã chặn quyền xem.\n\n👉 GIẢI PHÁP: Bạn vui lòng XÓA file này đi và TẢI LÊN LẠI file PDF đó nhé!");
+          return;
+        }
+        window.open(url, '_blank');
+      }
+    } else if (['DOCX', 'PPTX', 'XLSX'].includes(type)) {
+      window.open(`https://docs.google.com/viewer?url=${encodeURIComponent(url)}`, '_blank');
+    } else {
+      window.open(url, '_blank');
+    }
+  };
+
+  return (
+    <div className="space-y-6 animate-fade-in font-sans">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h2 className="text-base font-bold text-slate-800">Tài liệu học tập</h2>
+          <p className="text-xs text-slate-400 mt-0.5">Chia sẻ tài liệu, bài giảng và ghi chú với nhóm</p>
+        </div>
+        
+        <div className="flex items-center gap-3">
+          <div className="relative w-full sm:w-64">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Tìm tài liệu..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-10 pr-4 py-2.5 text-sm bg-white border border-slate-200 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 rounded-xl outline-none transition-all"
+            />
+          </div>
+          {canContribute && (
+            <label className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl cursor-pointer transition-all active:scale-95 shadow-md shadow-indigo-200 whitespace-nowrap shrink-0">
+              <Upload className="w-4 h-4" />
+              Tải lên
+              <input type="file" className="hidden" onChange={handleFileChange} accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*" disabled={uploading} />
+            </label>
+          )}
+        </div>
       </div>
-      {canContribute && (
-        <button className="inline-flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-xl border-0 cursor-pointer transition-all shadow-md shadow-indigo-200">
-          <Upload className="w-4 h-4" />
-          Tải lên
-        </button>
+
+      <div className="flex flex-wrap gap-2 border-b border-slate-100 pb-2">
+        {([
+          { id: 'all', label: 'Tất cả' },
+          { id: 'PDF', label: 'PDF' },
+          { id: 'DOCX', label: 'Word' },
+          { id: 'PPTX', label: 'PowerPoint' },
+          { id: 'XLSX', label: 'Excel' },
+          { id: 'IMAGE', label: 'Hình ảnh' },
+        ]).map(({ id, label }) => (
+          <button
+            key={id}
+            onClick={() => setTypeFilter(id)}
+            className={`px-4 py-1.5 text-xs font-bold rounded-full transition-all border-0 cursor-pointer ${typeFilter === id ? 'bg-indigo-600 text-white shadow-sm' : 'bg-white border border-slate-200 text-slate-500 hover:bg-slate-50'}`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {uploading && (
+        <div className="bg-white border border-indigo-100 rounded-2xl p-4 flex items-center gap-4">
+          <div className="w-10 h-10 rounded-full bg-indigo-50 flex items-center justify-center shrink-0">
+            <RefreshCw className="w-5 h-5 text-indigo-500 animate-spin" />
+          </div>
+          <div className="flex-1">
+            <div className="flex justify-between text-sm mb-1.5">
+              <span className="font-semibold text-slate-700">Đang tải lên...</span>
+              <span className="text-indigo-600 font-bold">{uploadProgress}%</span>
+            </div>
+            <div className="w-full bg-slate-100 rounded-full h-2">
+              <div className="bg-indigo-600 h-2 rounded-full transition-all duration-300" style={{ width: `${uploadProgress}%` }}></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {loading ? (
+        <div className="py-12 text-center">
+          <Loader2 className="w-8 h-8 text-indigo-400 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-slate-400">Đang tải danh sách tài liệu...</p>
+        </div>
+      ) : documents.length === 0 ? (
+        <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+          <div className="w-16 h-16 rounded-2xl bg-slate-50 flex items-center justify-center mx-auto mb-4">
+            <BookOpen className="w-8 h-8 text-slate-300" />
+          </div>
+          <p className="text-sm font-semibold text-slate-600">Chưa có tài liệu nào</p>
+          <p className="text-xs text-slate-400 mt-1 max-w-sm mx-auto">
+            {canContribute ? "Hãy tải lên các tài liệu hữu ích cho nhóm học tập của bạn." : "Nhóm này chưa có tài liệu nào được chia sẻ."}
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {documents.map((doc) => (
+            <div key={doc.id} className="bg-white border border-slate-100 rounded-2xl p-4 shadow-sm hover:shadow-md hover:border-indigo-100 transition-all group flex flex-col h-full">
+              <div className="flex items-start justify-between mb-3">
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${getFileColor(doc.type)}`}>
+                  {getFileIcon(doc.type)}
+                </div>
+                <div className="flex items-center gap-1">
+                  <button onClick={() => handleDownload(doc.id, doc.url, doc.name)} className="p-1.5 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-lg transition-colors bg-transparent border-0 cursor-pointer" title="Tải xuống">
+                    <Download className="w-4 h-4" />
+                  </button>
+                  {doc.canDelete && (
+                    <button onClick={() => handleDelete(doc.id)} className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors bg-transparent border-0 cursor-pointer" title="Xóa tài liệu">
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="flex-1">
+                <a href={doc.url} onClick={(e) => handlePreview(e, doc.id, doc.url, doc.type)} className="font-semibold text-sm text-slate-800 line-clamp-2 hover:text-indigo-600 transition-colors mb-1 text-decoration-none cursor-pointer">
+                  {doc.name}
+                </a>
+                <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-2">
+                  <span>{formatSize(doc.size)}</span>
+                  <span className="w-1 h-1 rounded-full bg-slate-300"></span>
+                  <span>{new Date(doc.createdAt).toLocaleDateString('vi-VN')}</span>
+                </p>
+              </div>
+
+              <div className="mt-4 pt-3 border-t border-slate-50 flex items-center gap-2">
+                <AvatarCircle name={doc.uploader?.name || 'Unknown'} avatarUrl={doc.uploader?.avatarUrl} size="sm" gradient="from-slate-400 to-slate-500" />
+                <div className="min-w-0">
+                  <p className="text-[11px] font-semibold text-slate-600 truncate">{doc.uploader?.name}</p>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
       )}
     </div>
-
-    {/* Quick categories */}
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-      {[
-        { label: 'Bài giảng', icon: BookOpen, color: 'text-blue-600 bg-blue-50 border-blue-100' },
-        { label: 'Bài tập', icon: ClipboardList, color: 'text-purple-600 bg-purple-50 border-purple-100' },
-        { label: 'Đề thi', icon: FileText, color: 'text-rose-600 bg-rose-50 border-rose-100' },
-        { label: 'Ghi chú', icon: Hash, color: 'text-amber-600 bg-amber-50 border-amber-100' },
-      ].map(({ label, icon: Icon, color }) => (
-        <button key={label} className={`flex flex-col items-center gap-2 p-4 border rounded-2xl transition-all hover:shadow-md cursor-pointer bg-white ${color.split(' ').slice(1).join(' ')}`}>
-          <Icon className={`w-6 h-6 ${color.split(' ')[0]}`} />
-          <span className={`text-xs font-semibold ${color.split(' ')[0]}`}>{label}</span>
-        </button>
-      ))}
-    </div>
-
-    {canContribute && (
-      <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center hover:border-indigo-300 transition-all cursor-pointer group">
-        <div className="w-14 h-14 rounded-2xl bg-indigo-50 group-hover:bg-indigo-100 flex items-center justify-center mx-auto mb-4 transition-all">
-          <Upload className="w-7 h-7 text-indigo-400" />
-        </div>
-        <p className="text-sm font-semibold text-slate-600">Kéo thả file vào đây hoặc nhấn để chọn</p>
-        <p className="text-xs text-slate-400 mt-2">Hỗ trợ PDF, Word, PowerPoint, ảnh (tối đa 50MB)</p>
-      </div>
-    )}
-  </div>
-);
+  );
+};
 
 // ——— Tab: Settings
 const SettingsTab = ({
@@ -1022,7 +1255,7 @@ const GroupWorkspacePage = () => {
                 onInviteClick={() => setShowInviteModal(true)}
               />
             )}
-            {activeTab === 'documents' && <DocumentsTab isMember={isMember} canContribute={canContribute} />}
+            {activeTab === 'documents' && <DocumentsTab group={group} isMember={isMember} canContribute={canContribute} isOwner={isOwner} />}
             {activeTab === 'settings' && isOwner && (
               <SettingsTab
                 group={group}

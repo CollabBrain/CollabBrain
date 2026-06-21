@@ -22,6 +22,8 @@ enum GroupRole {
 enum DocumentType {
   PDF
   DOCX
+  PPTX
+  XLSX
   LINK
   IMAGE
 }
@@ -128,14 +130,18 @@ model Document {
   type       DocumentType
   url        String
   size       Int?
+  mimeType   String?         @map("mime_type")
   isEmbedded Boolean         @default(false) @map("is_embedded")
   isDeleted  Boolean         @default(false) @map("is_deleted")
   createdAt  DateTime        @default(now()) @map("created_at")
-  groupId    String          @map("group_id")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  groupId    String?         @map("group_id")
   uploadedBy String          @map("uploaded_by")
-  group      Group           @relation(fields: [groupId], references: [id])
+  group      Group?          @relation(fields: [groupId], references: [id])
   uploader   User            @relation(fields: [uploadedBy], references: [id])
   chunks     DocumentChunk[]
+  @@index([groupId, createdAt])
+  @@index([uploadedBy, createdAt])
   @@map("documents")
 }
 
