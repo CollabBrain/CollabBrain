@@ -3,6 +3,9 @@ const router = Router()
 import * as ratelimit from "../../middlewares/client/rateLimit.middleware"
 import * as middleware from "../../middlewares/client/auth.middleware"
 import * as controller from "../../controllers/client/group.controller"
+import * as docController from "../../controllers/client/document.controller"
+import { upload } from "../../helpers/storageMulter"
+import { validateDocumentUpload } from "../../validates/client/document.validate"
 router.post("/",ratelimit.authIpLimiter,middleware.authMiddleware,controller.createGroupPost)
 
 
@@ -35,4 +38,12 @@ router.patch("/invitations/:invitationId/accept",ratelimit.authIpLimiter,middlew
 router.patch("/invitations/:invitationId/reject",ratelimit.authIpLimiter,middleware.authMiddleware,controller.rejectInvitationPatch)
 
 router.patch("/:groupId/transfer-owner",ratelimit.authIpLimiter,middleware.authMiddleware,controller.transferOwnerPatch)
+
+// ============================================================
+// Documents trong group
+// ============================================================
+router.post("/:groupId/documents/upload", ratelimit.authIpLimiter, middleware.authMiddleware, upload.single("file"), validateDocumentUpload, docController.uploadGroupDocumentPost)
+router.get("/:groupId/documents", ratelimit.authIpLimiter, middleware.authMiddleware, docController.getGroupDocumentsGet)
+
 export const  groupRoutes = router
+

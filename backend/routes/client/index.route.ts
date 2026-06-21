@@ -5,6 +5,7 @@ import { chatRoutes } from "./chat.route";
 import { groupRoutes } from "./group.routes";
 import { uploadRoutes } from "./upload.route";
 import { reportRoutes } from "./report.route";
+import { documentRoutes } from "./document.route";
 
 const clientRoutes = (app: Application)=>{
 app.use("/user", userRoutes)
@@ -19,5 +20,8 @@ app.use("/upload", uploadRoutes)
 app.use("/user/upload", uploadRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
 app.use("/reports", reportRoutes)
 app.use("/user/reports", reportRoutes)
+app.use("/documents", documentRoutes)
+app.use("/user/documents", documentRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
 }
 export default clientRoutes;
+

@@ -19,10 +19,12 @@ export const uploadToCloudinary = (
   folder: string = "collab_brain"
 ): Promise<{ url: string; publicId: string }> => {
   return new Promise((resolve, reject) => {
+    const resourceType = file.mimetype.startsWith("image/") ? "image" : "raw";
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         folder: folder,
-        resource_type: "auto", // tự động nhận diện ảnh/video/tài liệu
+        resource_type: resourceType,
       },
       (error, result) => {
         if (error) {
