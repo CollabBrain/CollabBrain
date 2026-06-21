@@ -1,0 +1,237 @@
+generator client {
+  provider = "prisma-client-js"
+  previewFeatures = ["fullTextSearchPostgres"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum AccountRole {
+  ADMIN
+  MANAGER
+  STAFF
+}
+
+enum GroupRole {
+  OWNER
+  MEMBER
+  VIEWER
+}
+
+enum DocumentType {
+  PDF
+  DOCX
+  PPTX
+  XLSX
+  LINK
+  IMAGE
+}
+enum FriendshipStatus {
+  PENDING
+  ACCEPTED
+  BLOCKED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+}
+
+enum GroupVisibility {
+  PUBLIC   // Ai cũng thấy, user gửi request → owner duyệt
+  PRIVATE  // Không ai thấy, owner tự thêm thành viên
+  INVITE   // Ai cũng thấy, chỉ owner gửi lời mời
+}
+
+enum InvitationType {
+  REQUEST  // User xin vào group (PUBLIC)
+  INVITE   // Owner mời user (INVITE)
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+
+model Account {
+  id           String      @id @default(uuid())
+  username        String      @unique
+  passwordHash String      @map("password_hash")
+  role         AccountRole @default(STAFF)
+  isActive     Boolean     @default(true) @map("is_active")
+  isDeleted    Boolean     @default(false) @map("is_deleted")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  @@map("accounts")
+}
+
+model User {
+  id        String        @id @default(uuid())
+  email     String        @unique
+  passwordHash String     @map("password_hash")
+  name      String
+  avatarUrl String?       @map("avatar_url")
+  coverUrl  String?       @map("cover_url")
+  bio       String?
+  isActive  Boolean       @default(true) @map("is_active")
+  isDeleted Boolean       @default(false) @map("is_deleted")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  groups              GroupMember[]
+  documents           Document[]
+  sentFriendships     Friendship[]      @relation("SentFriendships")
+  receivedFriendships Friendship[]      @relation("ReceivedFriendships")
+  groupInvitations    GroupInvitation[]  @relation("InvitationUser")
+  sentInvitations     GroupInvitation[]  @relation("InvitationSender")
+  sentMessages        Message[]         @relation("SentMessages")
+  receivedMessages    Message[]         @relation("ReceivedMessages")
+  reportsSent         Report[]          @relation("Reporter")
+  reportsReceived     Report[]          @relation("ReportedUser")
+  @@map("users")
+}
+
+model Group {
+  id          String          @id @default(uuid())
+  name        String
+  description String?
+  avatarUrl   String?         @map("avatar_url")
+  visibility  GroupVisibility  @default(PUBLIC)
+  isActive    Boolean         @default(true) @map("is_active")
+  isDeleted   Boolean         @default(false) @map("is_deleted")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+  members     GroupMember[]
+  documents   Document[]
+  invitations GroupInvitation[]
+  messages    Message[]
+  reports     Report[]
+  @@map("groups")
+}
+
+model GroupMember {
+  groupId   String    @map("group_id")
+  userId    String    @map("user_id")
+  role      GroupRole @default(MEMBER)
+  joinedAt  DateTime  @default(now()) @map("joined_at")
+  invitedBy String?   @map("invited_by")
+  group     Group     @relation(fields: [groupId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  @@id([groupId, userId])
+  @@map("group_members")
+}
+
+model Document {
+  id         String          @id @default(uuid())
+  name       String
+  type       DocumentType
+  url        String
+  size       Int?
+  mimeType   String?         @map("mime_type")
+  isEmbedded Boolean         @default(false) @map("is_embedded")
+  isDeleted  Boolean         @default(false) @map("is_deleted")
+  createdAt  DateTime        @default(now()) @map("created_at")
+  updatedAt  DateTime        @updatedAt @map("updated_at")
+  groupId    String?         @map("group_id")
+  uploadedBy String          @map("uploaded_by")
+  group      Group?          @relation(fields: [groupId], references: [id])
+  uploader   User            @relation(fields: [uploadedBy], references: [id])
+  chunks     DocumentChunk[]
+  @@index([groupId, createdAt])
+  @@index([uploadedBy, createdAt])
+  @@map("documents")
+}
+
+model DocumentChunk {
+  id         String   @id @default(uuid())
+  content    String
+  chunkIndex Int      @map("chunk_index")
+  documentId String   @map("document_id")
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  @@map("document_chunks")
+}
+model OtpVerification {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  otp       String
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+  @@map("otp_verifications")
+}
+model Friendship {
+  senderId   String           @map("sender_id")
+  receiverId String           @map("receiver_id")
+  status     FriendshipStatus @default(PENDING)
+  createdAt  DateTime         @default(now()) @map("created_at")
+  updatedAt  DateTime         @updatedAt @map("updated_at")
+
+
+  sender   User @relation("SentFriendships", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User @relation("ReceivedFriendships", fields: [receiverId], references: [id], onDelete: Cascade)
+
+
+  @@id([senderId, receiverId])
+  @@map("friendships")
+}
+
+model GroupInvitation {
+  id        String           @id @default(uuid())
+  type      InvitationType
+  status    InvitationStatus @default(PENDING)
+  groupId   String           @map("group_id")
+  userId    String           @map("user_id")
+  invitedBy String?          @map("invited_by")
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  group     Group  @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  user      User   @relation("InvitationUser", fields: [userId], references: [id], onDelete: Cascade)
+  sender    User?  @relation("InvitationSender", fields: [invitedBy], references: [id], onDelete: SetNull)
+
+  @@unique([groupId, userId])
+  @@map("group_invitations")
+}
+model Message {
+  id         String      @id @default(uuid())
+  content    String
+  type       MessageType @default(TEXT)
+  senderId   String      @map("sender_id")
+  receiverId String?     @map("receiver_id")  // có = chat 1-1, null = chat group
+  groupId    String?     @map("group_id")     // có = chat group, null = chat 1-1
+  isRead     Boolean     @default(false) @map("is_read")
+  createdAt  DateTime    @default(now()) @map("created_at")
+  deletedBySender   Boolean   @default(false) @map("deleted_by_sender")
+  deletedByReceiver Boolean   @default(false) @map("deleted_by_receiver")
+  sender   User   @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver User?  @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  group    Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([receiverId, createdAt])  // query chat 1-1 nhanh
+  @@index([groupId, createdAt])     // query chat group nhanh
+  @@map("messages")
+}
+
+enum ReportStatus {
+  PENDING
+  RESOLVED
+}
+
+model Report {
+  id            String       @id @default(uuid())
+  reporterId    String       @map("reporter_id")
+  targetUserId  String?      @map("target_user_id")
+  targetGroupId String?      @map("target_group_id")
+  reason        String
+  status        ReportStatus @default(PENDING)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  updatedAt     DateTime     @updatedAt @map("updated_at")
+
+  reporter      User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetUser    User?        @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  targetGroup   Group?       @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
+
+  @@map("reports")
+}
