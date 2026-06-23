@@ -10,6 +10,7 @@ export const createGroupPost = async (req: Request, res: Response) => {
     let dataGroup: groupTypeData = {
       name: req.body.name,
       avatarUrl: req.body.avatarUrl,
+      coverUrl: req.body.coverUrl,
       description: req.body.description,
       visibility: req.body.visibility
     }
@@ -164,6 +165,7 @@ export const updateGroupPatch = async (req: Request, res: Response) => {
     const data: groupTypeData = {
       name: req.body.name,
       avatarUrl: req.body.avatarUrl,
+      coverUrl: req.body.coverUrl,
       description: req.body.description,
       visibility: req.body.visibility
     }

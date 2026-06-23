@@ -9,7 +9,7 @@ import {
   restoreDocument,
 } from "../../repositories/client/document.repo";
 import { findGroupById, findGroupMember } from "../../repositories/client/group.repo";
-import { uploadToCloudinary } from "../../helpers/uploadToCloudinary";
+import { uploadToSupabase } from "../../helpers/upload";
 
 // ============================================================
 // Helpers
@@ -51,8 +51,8 @@ export const uploadPersonalDocumentService = async (
 
   const docType = getDocumentTypeFromMime(file.mimetype);
 
-  // Upload lên Cloudinary
-  const result = await uploadToCloudinary(file, `documents/personal/${userId}`);
+  // Upload lên Supabase
+  const result = await uploadToSupabase(file, `personal/${userId}`, "documents");
 
   // Lưu record vào DB
   const document = await createDocument({
@@ -96,8 +96,8 @@ export const uploadGroupDocumentService = async (
 
   const docType = getDocumentTypeFromMime(file.mimetype);
 
-  // Upload lên Cloudinary
-  const result = await uploadToCloudinary(file, `documents/groups/${groupId}`);
+  // Upload lên Supabase
+  const result = await uploadToSupabase(file, `groups/${groupId}`, "documents");
 
   // Lưu record vào DB
   const document = await createDocument({

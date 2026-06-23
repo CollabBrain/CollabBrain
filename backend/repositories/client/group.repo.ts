@@ -28,6 +28,7 @@ export const createGroup = async (data: groupTypeData, ownerId: string) => {
     data: {
       name: data.name,
       avatarUrl: data.avatarUrl,
+      coverUrl: data.coverUrl,
       description: data.description,
       visibility: data.visibility ?? "PUBLIC",
       members: {
