@@ -300,10 +300,10 @@ export const useTogglePinMessage = () => {
   const togglePinnedMessage = useChatStore((s) => s.togglePinnedMessage);
 
   return useMutation({
-    mutationFn: (messageId: string) => togglePinMessageApi(messageId),
-    onSuccess: ({ data }) => {
+    mutationFn: ({ messageId }: { messageId: string; conversationId: string }) => togglePinMessageApi(messageId),
+    onSuccess: ({ data }, variables) => {
       const msg = data.data!;
-      togglePinnedMessage(msg.conversationId, msg, msg.isPinned!);
+      togglePinnedMessage(variables.conversationId, msg, msg.isPinned!);
     },
   });
 };

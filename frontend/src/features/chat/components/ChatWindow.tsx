@@ -22,7 +22,9 @@ import {
   Paperclip,
   CornerUpLeft,
   FileText,
-  Image as ImageIcon
+  Image as ImageIcon,
+  ChevronUp,
+  Ban
 } from 'lucide-react';
 import { useChatStore, selectActiveMessages } from '../../../store/useChatStore';
 import {
@@ -159,6 +161,7 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   const [showScrollBtn, setShowScrollBtn] = useState(false);
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const [selectedFile, setSelectedFile] = useState<{ file: File; type: 'image' | 'file'; previewUrl?: string } | null>(null);
+  const [expandedPins, setExpandedPins] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -197,6 +200,15 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
+
+  const handleScrollToMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('animate-pulse');
+      setTimeout(() => el.classList.remove('animate-pulse'), 2000);
+    }
+  };
 
   // Đánh dấu đã đọc khi mở
   const markedRef = useRef<string>('');
@@ -365,7 +377,7 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
 
   const handleTogglePin = () => {
     if (!contextMenu) return;
-    pinMutation.mutate(contextMenu.messageId);
+    pinMutation.mutate({ messageId: contextMenu.messageId, conversationId: conversation.id });
     closeContextMenu();
   };
 
@@ -391,18 +403,44 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
 
       {/* Pinned Messages Bar */}
       {pinnedMessages.length > 0 && (
-        <div className="bg-card border-b border-border px-4 py-2 text-sm shadow-sm z-10 sticky top-0 flex items-center justify-between">
-          <div className="flex items-center gap-2 overflow-hidden flex-1">
-            <Pin className="h-4 w-4 text-primary shrink-0" />
-            <div className="flex flex-col min-w-0 flex-1">
-              <span className="font-medium text-xs text-primary truncate">Tin nhắn ghim</span>
-              <span className="text-muted-foreground truncate opacity-90">{pinnedMessages[0].content || 'File đính kèm'}</span>
+        <div className="bg-primary/5 border-b border-primary/10 px-4 py-2 sticky top-0 z-10">
+          <div className="flex items-center gap-2">
+            <Pin className="w-3.5 h-3.5 text-primary shrink-0" />
+            <div 
+              className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => handleScrollToMessage(pinnedMessages[0].id)}
+            >
+              <p className="text-xs font-bold text-primary">{pinnedMessages.length} tin nhắn đã ghim</p>
+              <p className="text-xs text-primary/80 truncate mt-0.5">
+                {pinnedMessages[0].senderId === currentUserId ? 'Bạn' : other.name}: {pinnedMessages[0].isRecalled ? <span className="inline-flex items-center gap-1 align-text-bottom"><Ban className="w-3 h-3" /> Tin nhắn đã được thu hồi</span> : pinnedMessages[0].content || '[File/Ảnh]'}
+              </p>
             </div>
+            <button onClick={() => setExpandedPins(!expandedPins)} className="p-1 text-primary hover:bg-primary/10 transition-colors rounded">
+              {expandedPins ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
           </div>
-          {pinnedMessages.length > 1 && (
-            <span className="text-xs font-medium text-primary bg-primary/10 px-2 py-0.5 rounded-full shrink-0">
-              +{pinnedMessages.length - 1}
-            </span>
+
+          {expandedPins && (
+            <div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
+              {pinnedMessages.map(msg => (
+                <div key={msg.id} className="flex items-start gap-2 p-2 bg-background rounded-xl border border-primary/10 shadow-sm">
+                  <div className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => handleScrollToMessage(msg.id)}>
+                    <p className="text-xs font-bold text-foreground">{msg.senderId === currentUserId ? 'Bạn' : other.name}</p>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {msg.isRecalled ? <span className="inline-flex items-center gap-1 align-text-bottom"><Ban className="w-3 h-3" /> Thu hồi</span> : msg.content || '[File/Ảnh]'}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); pinMutation.mutate({ messageId: msg.id, conversationId: conversation.id }); }} 
+                    disabled={pinMutation.isPending}
+                    className="p-1.5 bg-primary/10 text-primary hover:bg-rose-100 hover:text-rose-500 border border-primary/20 cursor-pointer rounded-md shrink-0 flex items-center justify-center transition-colors disabled:opacity-50" 
+                    title="Bỏ ghim"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
           )}
         </div>
       )}

@@ -186,13 +186,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
   togglePinnedMessage: (conversationId, message, isPinned) =>
     set((state) => {
-      const current = state.pinnedMessagesByConversation[conversationId] || [];
-      if (isPinned) {
-        if (current.some(m => m.id === message.id)) return state;
-        return { pinnedMessagesByConversation: { ...state.pinnedMessagesByConversation, [conversationId]: [message, ...current] } };
-      } else {
-        return { pinnedMessagesByConversation: { ...state.pinnedMessagesByConversation, [conversationId]: current.filter(m => m.id !== message.id) } };
-      }
+      const currentPins = state.pinnedMessagesByConversation[conversationId] || [];
+      const currentMsgs = state.messagesByConversation[conversationId] || [];
+      
+      const newPins = isPinned 
+        ? (currentPins.some(m => m.id === message.id) ? currentPins : [message, ...currentPins])
+        : currentPins.filter(m => m.id !== message.id);
+        
+      const newMsgs = currentMsgs.map(m => m.id === message.id ? { ...m, isPinned } : m);
+
+      return { 
+        pinnedMessagesByConversation: { ...state.pinnedMessagesByConversation, [conversationId]: newPins },
+        messagesByConversation: { ...state.messagesByConversation, [conversationId]: newMsgs }
+      };
     }),
 }));
 

@@ -148,7 +148,7 @@ const MessageBubble = ({
   const isImage = message.type === 'IMAGE' || message.type === 'image';
 
   return (
-    <div className={`flex gap-2 group/bubble ${isMe ? 'flex-row-reverse' : 'flex-row'} ${isConsecutive ? 'mt-0.5' : 'mt-4'}`}>
+    <div id={`msg-${message.id}`} className={`flex gap-2 group/bubble ${isMe ? 'flex-row-reverse' : 'flex-row'} ${isConsecutive ? 'mt-0.5' : 'mt-4'}`}>
       {/* Avatar — chỉ hiển thị nếu không phải consecutive và không phải tin của mình */}
       {!isMe && (
         <div className="w-8 shrink-0 self-end">
@@ -269,6 +269,15 @@ const PinnedMessagesBar = ({
 }) => {
   const [expanded, setExpanded] = useState(false);
 
+  const handleScrollToMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('animate-pulse');
+      setTimeout(() => el.classList.remove('animate-pulse'), 2000);
+    }
+  };
+
   if (pinnedMessages.length === 0) return null;
 
   const latest = pinnedMessages[0];
@@ -276,10 +285,13 @@ const PinnedMessagesBar = ({
     <div className="bg-amber-50 border-b border-amber-100 px-4 py-2">
       <div className="flex items-center gap-2">
         <Pin className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-        <div className="flex-1 min-w-0">
+        <div 
+          className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity" 
+          onClick={() => handleScrollToMessage(latest.id)}
+        >
           <p className="text-xs font-bold text-amber-700">{pinnedMessages.length} tin nhắn đã ghim</p>
           <p className="text-xs text-amber-600 truncate mt-0.5">
-            {latest.sender?.name}: {latest.isRecalled ? <span className="inline-flex items-center gap-1 align-text-bottom"><Ban className="w-3 h-3" /> Tin nhắn đã được thu hồi</span> : latest.content}
+            {latest.sender?.name}: {latest.isRecalled ? <span className="inline-flex items-center gap-1 align-text-bottom"><Ban className="w-3 h-3" /> Tin nhắn đã được thu hồi</span> : latest.content || '[File/Ảnh]'}
           </p>
         </div>
         <button onClick={() => setExpanded(!expanded)} className="p-1 text-amber-500 border-0 bg-transparent cursor-pointer rounded">
@@ -292,14 +304,21 @@ const PinnedMessagesBar = ({
           {pinnedMessages.map(msg => (
             <div key={msg.id} className="flex items-start gap-2 p-2 bg-white rounded-xl border border-amber-100">
               <Avatar name={msg.sender?.name || '?'} avatarUrl={msg.sender?.avatarUrl} />
-              <div className="flex-1 min-w-0">
+              <div 
+                className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+                onClick={() => handleScrollToMessage(msg.id)}
+              >
                 <p className="text-xs font-bold text-slate-700">{msg.sender?.name}</p>
                 <p className="text-xs text-slate-500 truncate mt-0.5">
-                  {msg.isRecalled ? <span className="inline-flex items-center gap-1 align-text-bottom"><Ban className="w-3 h-3" /> Thu hồi</span> : msg.content}
+                  {msg.isRecalled ? <span className="inline-flex items-center gap-1 align-text-bottom"><Ban className="w-3 h-3" /> Thu hồi</span> : msg.content || '[File/Ảnh]'}
                 </p>
               </div>
               {isOwner && (
-                <button onClick={() => onUnpin(msg.id)} className="p-1 text-amber-400 hover:text-rose-500 border-0 bg-transparent cursor-pointer rounded shrink-0" title="Bỏ ghim">
+                <button 
+                  onClick={(e) => { e.stopPropagation(); onUnpin(msg.id); }} 
+                  className="p-1.5 bg-amber-100 text-amber-600 hover:bg-rose-100 hover:text-rose-500 border border-amber-200 cursor-pointer rounded-md shrink-0 flex items-center justify-center transition-colors" 
+                  title="Bỏ ghim"
+                >
                   <X className="w-3.5 h-3.5" />
                 </button>
               )}
