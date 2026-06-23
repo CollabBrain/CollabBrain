@@ -33,8 +33,8 @@ export const chatSocket = (io: Server) => {
 
     socket.on("chat:send_message", async (data) => {
       try {
-        const { conversationId, content, type = "text" } = data
-        const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any)
+        const { conversationId, content, type = "text", replyToId } = data
+        const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any, replyToId)
 
         const formattedMessage = {
           ...savedMessage,

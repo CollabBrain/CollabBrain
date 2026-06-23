@@ -24,6 +24,10 @@ router.patch("/read/:userId", ratelimit.authIpLimiter, middleware.authMiddleware
 router.patch("/delete/:messageId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.deleteMessagePatch)
 router.delete("/messages/:messageId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.deleteMessage)
 
+// Pin & Pinned Messages (1-1 Chat)
+router.get("/conversations/:conversationId/messages/pinned", ratelimit.authIpLimiter, middleware.authMiddleware, controller.getPinnedChatMessages)
+router.patch("/messages/:msgId/pin", ratelimit.authIpLimiter, middleware.authMiddleware, controller.pinChatMessage)
+
 router.post("/upload", ratelimit.authIpLimiter, middleware.authMiddleware, upload.single("file"), controller.uploadFilePost)
 
 // ——— GROUP CHAT Routes ———

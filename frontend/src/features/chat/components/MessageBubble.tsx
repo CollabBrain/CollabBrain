@@ -1,6 +1,6 @@
 import { cn } from '../../../lib/utils';
 import type { Message, ChatUser } from '../../../types/chat.types';
-import { CheckCheck, Check } from 'lucide-react';
+import { CheckCheck, Check, FileText, Download } from 'lucide-react';
 
 interface MessageBubbleProps {
   message: Message;
@@ -71,7 +71,7 @@ const MessageBubble = ({
       >
         <div
           className={cn(
-            'px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm',
+            'px-4 py-2.5 rounded-2xl text-sm leading-relaxed break-words shadow-sm flex flex-col gap-1',
             isMine
               ? 'bg-primary text-primary-foreground rounded-br-sm'
               : 'bg-muted text-foreground rounded-bl-sm',
@@ -80,7 +80,74 @@ const MessageBubble = ({
             !isLastInGroup && !isMine && 'rounded-bl-2xl'
           )}
         >
-          {message.content}
+          {/* Reply Preview */}
+          {message.replyTo && (
+            <div
+              className={cn(
+                'text-xs pl-2.5 py-1 mb-1 border-l-2 cursor-pointer opacity-90 transition-opacity hover:opacity-100',
+                isMine ? 'border-primary-foreground/40 bg-primary-foreground/10' : 'border-primary bg-primary/5',
+                'rounded-r-md'
+              )}
+              onClick={() => {
+                const el = document.getElementById(`msg-${message.replyToId}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.classList.add('animate-pulse');
+                  setTimeout(() => el.classList.remove('animate-pulse'), 2000);
+                }
+              }}
+            >
+              <div className="font-semibold mb-0.5 truncate">
+                {message.replyTo.sender?.name || 'User'}
+              </div>
+              <div className="truncate max-w-[200px]">
+                {message.replyTo.isRecalled
+                  ? 'Tin nhắn đã được thu hồi'
+                  : message.replyTo.content || '[File/Ảnh]'}
+              </div>
+            </div>
+          )}
+
+          {/* Message Content */}
+          {message.isRecalled ? (
+            <span className="italic opacity-80">{message.content}</span>
+          ) : message.type === 'image' || message.type === 'IMAGE' ? (
+            <div className="mt-1 mb-1">
+              <img
+                src={message.content}
+                alt="Image"
+                className="max-w-full rounded-lg max-h-[300px] object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                onClick={() => window.open(message.content, '_blank')}
+                loading="lazy"
+              />
+            </div>
+          ) : message.type === 'file' || message.type === 'FILE' ? (
+            <a
+              href={message.content}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                'flex items-center gap-3 p-3 rounded-xl mt-1 w-full sm:w-[280px] max-w-full hover:bg-black/5 transition-colors',
+                isMine ? 'bg-primary-foreground/10 text-primary-foreground' : 'bg-background text-foreground border border-border'
+              )}
+            >
+              <div className={cn(
+                'h-10 w-10 shrink-0 rounded-lg flex items-center justify-center',
+                isMine ? 'bg-primary-foreground/20' : 'bg-primary/10'
+              )}>
+                <FileText className={cn("h-5 w-5", isMine ? "text-primary-foreground" : "text-primary")} />
+              </div>
+              <div className="flex-1 min-w-0 flex flex-col">
+                <span className="font-medium text-sm truncate">
+                  {message.content.split('/').pop()?.split('?')[0] || 'Tài liệu đính kèm'}
+                </span>
+                <span className="text-xs opacity-70">Nhấn để tải xuống</span>
+              </div>
+              <Download className="h-4 w-4 shrink-0 opacity-70" />
+            </a>
+          ) : (
+            <span>{message.content}</span>
+          )}
         </div>
 
         {/* Timestamp + read status — hiện khi hover hoặc tin cuối nhóm */}

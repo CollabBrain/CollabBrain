@@ -17,14 +17,14 @@ import {
 // ——— CHAT 1-1 (giữ nguyên) ———
 // ============================================================
 
-export const sendMessageService = async (senderId: string, receiverId: string, content: string, type: MessageType = "TEXT") => {
+export const sendMessageService = async (senderId: string, receiverId: string, content: string, type: MessageType = "TEXT", replyToId?: string) => {
   const existing = await findFriendship(senderId, receiverId)
   const reverse = await findFriendship(receiverId, senderId)
   const friendShip = existing || reverse
   if (!friendShip || friendShip?.status !== "ACCEPTED") {
     throw new Error("Không thể gửi tin nhắn. Hai người chưa là bạn bè")
   }
-  const newMessage = await createMessage(senderId, receiverId, content, type)
+  const newMessage = await createMessage(senderId, receiverId, content, type, replyToId)
   return {
     message: "Gửi tin nhắn thành công",
     data: newMessage
@@ -79,6 +79,10 @@ export const recallMessageService = async (myId: string, messageId: string) => {
       content: "🚫 Tin nhắn đã được thu hồi",
       type: "TEXT",
       isRecalled: true
+    },
+    include: {
+      sender: { select: { id: true, name: true, avatarUrl: true } },
+      replyTo: { include: { sender: { select: { id: true, name: true, avatarUrl: true } } } }
     }
   });
   return {
@@ -95,6 +99,66 @@ export const uploadToSupabasePostService = async (file: Express.Multer.File, pat
     message: "Upload thành công"
   }
 }
+
+/**
+ * Toggle pin tin nhắn chat 1-1
+ */
+export const togglePinChatMessageService = async (messageId: string, userId: string) => {
+  const msg = await findMessageById(messageId);
+  if (!msg) throw new Error("Không tìm thấy tin nhắn");
+
+  // Kiểm tra quyền (phải là ng gửi hoặc ng nhận)
+  if (msg.senderId !== userId && msg.receiverId !== userId) {
+    throw new Error("Tin nhắn không thuộc cuộc trò chuyện của bạn");
+  }
+
+  if (msg.isPinned) {
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: { isPinned: false, pinnedBy: null, pinnedAt: null },
+      include: {
+        sender: { select: { id: true, name: true, avatarUrl: true } },
+        replyTo: { include: { sender: { select: { id: true, name: true, avatarUrl: true } } } }
+      }
+    });
+    return { message: "Đã bỏ ghim tin nhắn", data: updated, isPinned: false };
+  } else {
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: { isPinned: true, pinnedBy: userId, pinnedAt: new Date() },
+      include: {
+        sender: { select: { id: true, name: true, avatarUrl: true } },
+        replyTo: { include: { sender: { select: { id: true, name: true, avatarUrl: true } } } }
+      }
+    });
+    return { message: "Đã ghim tin nhắn", data: updated, isPinned: true };
+  }
+};
+
+/**
+ * Lấy danh sách tin nhắn ghim chat 1-1
+ */
+export const getPinnedChatMessagesService = async (myId: string, targetId: string) => {
+  const messages = await prisma.message.findMany({
+    where: {
+      OR: [
+        { senderId: myId, receiverId: targetId },
+        { senderId: targetId, receiverId: myId }
+      ],
+      isPinned: true
+    },
+    orderBy: { pinnedAt: "desc" },
+    include: {
+      sender: { select: { id: true, name: true, avatarUrl: true } },
+      replyTo: { include: { sender: { select: { id: true, name: true, avatarUrl: true } } } }
+    }
+  });
+
+  return {
+    data: messages,
+    message: "Lấy danh sách tin nhắn ghim thành công"
+  };
+};
 
 // ============================================================
 // ——— GROUP CHAT ———

@@ -17,6 +17,11 @@ export interface Message {
   type: 'text' | 'image' | 'file';
   isRead: boolean;
   isRecalled?: boolean;
+  isPinned?: boolean;
+  pinnedBy?: string | null;
+  pinnedAt?: string | null;
+  replyToId?: string | null;
+  replyTo?: ReplyPreview | null;
   createdAt: string;
   updatedAt: string;
   sender?: ChatUser;
@@ -36,6 +41,7 @@ export interface SendMessagePayload {
   conversationId: string;
   content: string;
   type?: 'text' | 'image' | 'file';
+  replyToId?: string;
 }
 
 export interface CreateConversationPayload {

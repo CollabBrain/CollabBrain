@@ -5,13 +5,18 @@ import { MessageType } from "@prisma/client";
 // ——— CHAT 1-1 (giữ nguyên) ———
 // ============================================================
 
-export const createMessage = async (senderId: string, receiverId: string, content: string, type: MessageType = "TEXT") => {
+export const createMessage = async (senderId: string, receiverId: string, content: string, type: MessageType = "TEXT", replyToId?: string) => {
   return prisma.message.create({
     data: {
       senderId,
       receiverId,
       content,
-      type
+      type,
+      replyToId
+    },
+    include: {
+      sender: { select: { id: true, name: true, avatarUrl: true } },
+      replyTo: { include: { sender: { select: { id: true, name: true, avatarUrl: true } } } }
     }
   })
 }

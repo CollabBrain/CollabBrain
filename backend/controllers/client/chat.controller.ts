@@ -1,5 +1,19 @@
 import { Request, Response } from "express";
-import { deleteMessageService, getChatHistoryService, markReadService, uploadToSupabasePostService, recallMessageService, sendGroupMessageService, getGroupHistoryService, togglePinMessageService, getPinnedMessagesService, recallGroupMessageService, uploadGroupChatFileService } from "../../services/client/chat.service";
+import { 
+  deleteMessageService, 
+  getChatHistoryService, 
+  markReadService, 
+  uploadToSupabasePostService, 
+  recallMessageService, 
+  sendGroupMessageService, 
+  getGroupHistoryService, 
+  togglePinMessageService,
+  getPinnedMessagesService,
+  togglePinChatMessageService, 
+  getPinnedChatMessagesService, 
+  recallGroupMessageService, 
+  uploadGroupChatFileService 
+} from "../../services/client/chat.service";
 import prisma from "../../config/prisma";
 import { getListFriend } from "../../repositories/client/friend.repo";
 import { getMessageBetweenUsers, markMessageAsRead } from "../../repositories/client/chat.repo";
@@ -520,6 +534,44 @@ export const deleteMessage = async (req: Request, res: Response) => {
       code: 400,
       message: `Lỗi: ${error.message}`
     });
+  }
+};
+
+//[PATCH] /chat/messages/:msgId/pin
+export const pinChatMessage = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const msgId = req.params.msgId as string;
+    const result = await togglePinChatMessageService(msgId, myId);
+    
+    const io = req.app.get("io");
+    if (io) {
+      // Phát tới người kia
+      const targetId = result.data.senderId === myId ? result.data.receiverId : result.data.senderId;
+      if (targetId) {
+        io.to(targetId).emit("chat:message_pinned", {
+          messageId: msgId,
+          message: result.data,
+          isPinned: result.isPinned,
+          conversationId: myId // the sender of the event
+        });
+      }
+    }
+    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
+  }
+};
+
+//[GET] /chat/conversations/:conversationId/messages/pinned
+export const getPinnedChatMessages = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const targetId = req.params.conversationId as string;
+    const result = await getPinnedChatMessagesService(myId, targetId);
+    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }
 };
 

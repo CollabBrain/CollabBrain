@@ -20,6 +20,9 @@ interface ChatState {
   messagePage: Record<string, number>;
   hasMoreMessages: Record<string, boolean>;
 
+  // Pinned messages
+  pinnedMessagesByConversation: Record<string, Message[]>;
+
   // ——— Actions ———
   setConversations: (convs: Conversation[]) => void;
   addOrUpdateConversation: (conv: Conversation) => void;
@@ -36,6 +39,9 @@ interface ChatState {
   setHasMore: (conversationId: string, hasMore: boolean) => void;
   incrementPage: (conversationId: string) => void;
   resetMessages: (conversationId: string) => void;
+
+  setPinnedMessages: (conversationId: string, messages: Message[]) => void;
+  togglePinnedMessage: (conversationId: string, message: Message, isPinned: boolean) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -46,6 +52,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   onlineUsers: {},
   messagePage: {},
   hasMoreMessages: {},
+  pinnedMessagesByConversation: {},
 
   setConversations: (convs) =>
     set((state) => {
@@ -171,6 +178,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messagePage: { ...state.messagePage, [conversationId]: 1 },
       hasMoreMessages: { ...state.hasMoreMessages, [conversationId]: true },
     })),
+
+  setPinnedMessages: (conversationId, messages) =>
+    set((state) => ({
+      pinnedMessagesByConversation: { ...state.pinnedMessagesByConversation, [conversationId]: messages }
+    })),
+
+  togglePinnedMessage: (conversationId, message, isPinned) =>
+    set((state) => {
+      const current = state.pinnedMessagesByConversation[conversationId] || [];
+      if (isPinned) {
+        if (current.some(m => m.id === message.id)) return state;
+        return { pinnedMessagesByConversation: { ...state.pinnedMessagesByConversation, [conversationId]: [message, ...current] } };
+      } else {
+        return { pinnedMessagesByConversation: { ...state.pinnedMessagesByConversation, [conversationId]: current.filter(m => m.id !== message.id) } };
+      }
+    }),
 }));
 
 // ——— Selectors ———

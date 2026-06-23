@@ -14,6 +14,9 @@ import {
   createOrGetConversationApi,
   markAsReadApi,
   searchUsersApi,
+  getPinnedMessagesApi,
+  togglePinMessageApi,
+  uploadFileApi,
 } from '../services/chat.service';
 import type {
   SendMessagePayload,
@@ -274,6 +277,43 @@ export const useSearchUsers = (query: string) => {
   });
 };
 
+// ========== Pinned Messages & File Upload ==========
+
+export const usePinnedMessages = (conversationId: string | null) => {
+  const setPinnedMessages = useChatStore((s) => s.setPinnedMessages);
+
+  return useQuery({
+    queryKey: ['chat', 'pinned', conversationId],
+    enabled: !!conversationId,
+    queryFn: async () => {
+      if (!conversationId) return [];
+      const res = await getPinnedMessagesApi(conversationId);
+      const msgs = res.data.data ?? [];
+      setPinnedMessages(conversationId, msgs);
+      return msgs;
+    },
+    staleTime: 30_000,
+  });
+};
+
+export const useTogglePinMessage = () => {
+  const togglePinnedMessage = useChatStore((s) => s.togglePinnedMessage);
+
+  return useMutation({
+    mutationFn: (messageId: string) => togglePinMessageApi(messageId),
+    onSuccess: ({ data }) => {
+      const msg = data.data!;
+      togglePinnedMessage(msg.conversationId, msg, msg.isPinned!);
+    },
+  });
+};
+
+export const useUploadChatFile = () => {
+  return useMutation({
+    mutationFn: (file: File) => uploadFileApi(file),
+  });
+};
+
 // ========== Socket Integration ==========
 
 /**
@@ -381,6 +421,13 @@ export const useChatSocket = () => {
     []
   );
 
+  const handleMessagePinned = useCallback(
+    ({ messageId, message, isPinned, conversationId }: any) => {
+      useChatStore.getState().togglePinnedMessage(conversationId, message, isPinned);
+    },
+    []
+  );
+
   useEffect(() => {
     if (!accessToken) return;
     const socket = getSocket();
@@ -391,6 +438,7 @@ export const useChatSocket = () => {
     socket.on('user:online_status', handleOnlineStatus);
     socket.on('chat:message_recalled', handleMessageRecalled);
     socket.on('chat:message_deleted', handleMessageDeleted);
+    socket.on('chat:message_pinned', handleMessagePinned);
 
     return () => {
       socket.off('chat:new_message', handleNewMessage);
@@ -398,6 +446,7 @@ export const useChatSocket = () => {
       socket.off('user:online_status', handleOnlineStatus);
       socket.off('chat:message_recalled', handleMessageRecalled);
       socket.off('chat:message_deleted', handleMessageDeleted);
+      socket.off('chat:message_pinned', handleMessagePinned);
     };
   }, [accessToken, handleNewMessage, handleTyping, handleOnlineStatus, handleMessageRecalled, handleMessageDeleted]);
 };
