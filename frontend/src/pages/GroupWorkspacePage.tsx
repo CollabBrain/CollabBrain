@@ -39,6 +39,10 @@ import type {
 } from '../features/group/services/group.service';
 import AvatarUpload from '../components/common/AvatarUpload';
 import axiosInstance from '../services/axiosInstance';
+import { useAuthStore } from '../store/useAuthStore';
+import GroupChatTab from '../features/group/components/GroupChatTab';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { initSocket } from '../socket/socket';
 
 // ——— Types
 type ActiveTab = 'chat' | 'members' | 'documents' | 'settings';
@@ -942,6 +946,19 @@ const GroupWorkspacePage = () => {
   const initialTab = (searchParams.get('tab') as ActiveTab) || 'members';
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
 
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const [myUserId, setMyUserId] = useState('');
+
+  // Parse userId from JWT token
+  useEffect(() => {
+    if (!accessToken) return;
+    initSocket(accessToken);
+    try {
+      const payload = JSON.parse(atob(accessToken.split('.')[1]));
+      setMyUserId(payload.id ?? payload.sub ?? payload.userId ?? '');
+    } catch { /* ignore */ }
+  }, [accessToken]);
+
   // ——— Data state
   const [group, setGroup] = useState<GroupWithRole | null>(null);
   const [groupLoading, setGroupLoading] = useState(true);
@@ -1340,7 +1357,17 @@ const GroupWorkspacePage = () => {
           </div>
         ) : (
           <>
-            {activeTab === 'chat' && isMember && <ChatTab group={group} canContribute={canContribute} />}
+            {activeTab === 'chat' && isMember && myUserId && (
+              <ErrorBoundary fallbackLabel="Lỗi tải Group Chat">
+                <GroupChatTab
+                  groupId={groupId!}
+                  groupName={group.name}
+                  myUserId={myUserId}
+                  myRole={membershipStatus as 'OWNER' | 'MEMBER' | 'VIEWER'}
+                  members={members}
+                />
+              </ErrorBoundary>
+            )}
             {activeTab === 'members' && (
               <MembersTab
                 group={group}

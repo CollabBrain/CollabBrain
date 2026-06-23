@@ -1,23 +1,39 @@
-import {Server, Socket} from "socket.io"
-import { createMessage } from "../repositories/client/chat.repo"
+import { Server, Socket } from "socket.io"
+import { createMessage, createGroupMessage, findGroupMessageById, recallGroupMessage } from "../repositories/client/chat.repo"
+import prisma from "../config/prisma"
 
 export const chatSocket = (io: Server) => {
   const onlineUsers = new Map<string, string>()
 
-  io.on("connection", (socket: Socket) => {
+  io.on("connection", async (socket: Socket) => {
     const user = socket.data.user
 
     socket.join(user.id)
     onlineUsers.set(user.id, socket.id)
 
+    // ——— Tự động join tất cả group rooms của user ———
+    try {
+      const memberships = await prisma.groupMember.findMany({
+        where: { userId: user.id },
+        select: { groupId: true }
+      })
+      memberships.forEach(({ groupId }) => {
+        socket.join(`group:${groupId}`)
+      })
+    } catch (e) {
+      console.error("[Socket] Lỗi join group rooms:", e)
+    }
+
     // Thông báo user online cho tất cả
     socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: true })
 
-    // ——— Gửi tin nhắn ———
+    // ================================================================
+    // ——— CHAT 1-1 ———
+    // ================================================================
+
     socket.on("chat:send_message", async (data) => {
       try {
         const { conversationId, content, type = "text" } = data
-        // conversationId = receiverId trong hệ thống này
         const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any)
 
         const formattedMessage = {
@@ -26,16 +42,13 @@ export const chatSocket = (io: Server) => {
           type: savedMessage.type.toLowerCase()
         }
 
-        // Gửi cho người nhận
         io.to(conversationId).emit("chat:new_message", { message: formattedMessage })
-        // Gửi lại cho người gửi để xác nhận
         socket.emit("chat:new_message", { message: formattedMessage })
       } catch (error: any) {
         socket.emit("chat:error", { message: error.message })
       }
     })
 
-    // ——— Đang nhập ———
     socket.on("chat:typing", ({ conversationId, isTyping }: { conversationId: string; isTyping: boolean }) => {
       io.to(conversationId).emit("chat:typing", {
         conversationId,
@@ -44,7 +57,105 @@ export const chatSocket = (io: Server) => {
       })
     })
 
+    // ================================================================
+    // ——— GROUP CHAT ———
+    // ================================================================
+
+    // --- group:send_message ---
+    socket.on("group:send_message", async (data) => {
+      try {
+        const { groupId, content, type = "text", replyToId, mentionIds } = data
+        if (!groupId || !content) return
+
+        // Kiểm tra quyền thành viên
+        const member = await prisma.groupMember.findUnique({
+          where: { groupId_userId: { groupId, userId: user.id } }
+        })
+        if (!member) {
+          socket.emit("group:error", { message: "Bạn không phải thành viên nhóm này" })
+          return
+        }
+        if (member.role === "VIEWER") {
+          socket.emit("group:error", { message: "VIEWER không được phép gửi tin nhắn" })
+          return
+        }
+
+        // Kiểm tra replyToId hợp lệ (nếu có)
+        if (replyToId) {
+          const replyMsg = await prisma.message.findFirst({ where: { id: replyToId, groupId } })
+          if (!replyMsg) {
+            socket.emit("group:error", { message: "Tin nhắn reply không tồn tại" })
+            return
+          }
+        }
+
+        const savedMessage = await createGroupMessage(
+          user.id,
+          groupId,
+          content,
+          type.toUpperCase() as any,
+          replyToId,
+          mentionIds
+        )
+
+        // Broadcast cho tất cả member trong group room (kể cả sender)
+        io.to(`group:${groupId}`).emit("group:new_message", {
+          groupId,
+          message: savedMessage
+        })
+      } catch (error: any) {
+        console.error("[Socket group:send_message]", error.message)
+        socket.emit("group:error", { message: error.message })
+      }
+    })
+
+    // --- group:typing ---
+    socket.on("group:typing", ({ groupId, isTyping }: { groupId: string; isTyping: boolean }) => {
+      // Broadcast tới các thành viên khác trong room (không gửi lại cho chính sender)
+      socket.to(`group:${groupId}`).emit("group:typing", {
+        groupId,
+        userId: user.id,
+        userName: user.name || user.email || "Ai đó",
+        isTyping
+      })
+    })
+
+    // --- group:recall_message ---
+    socket.on("group:recall_message", async ({ groupId, messageId }: { groupId: string; messageId: string }) => {
+      try {
+        const msg = await findGroupMessageById(messageId)
+        if (!msg) {
+          socket.emit("group:error", { message: "Không tìm thấy tin nhắn" })
+          return
+        }
+        if (msg.groupId !== groupId) {
+          socket.emit("group:error", { message: "Tin nhắn không thuộc nhóm này" })
+          return
+        }
+        if (msg.senderId !== user.id) {
+          socket.emit("group:error", { message: "Bạn không có quyền thu hồi tin nhắn này" })
+          return
+        }
+        if (msg.isRecalled) {
+          socket.emit("group:error", { message: "Tin nhắn đã được thu hồi trước đó" })
+          return
+        }
+
+        const recalled = await recallGroupMessage(messageId)
+        io.to(`group:${groupId}`).emit("group:message_recalled", {
+          groupId,
+          messageId,
+          message: recalled
+        })
+      } catch (error: any) {
+        console.error("[Socket group:recall_message]", error.message)
+        socket.emit("group:error", { message: error.message })
+      }
+    })
+
+    // ================================================================
     // ——— Ngắt kết nối ———
+    // ================================================================
     socket.on("disconnect", () => {
       onlineUsers.delete(user.id)
       socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: false })

@@ -19,11 +19,20 @@ router.get("/users/search", ratelimit.authIpLimiter, middleware.authMiddleware, 
 router.post("/messages", ratelimit.authIpLimiter, middleware.authMiddleware, controller.sendMessage)
 
 // Endpoints cũ của backend
-router.get("/history/:userId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.getHistory)
-router.patch("/read/:userId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.markedReadPatch)
-router.patch("/delete/:messageId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.deleteMessagePatch)
-router.delete("/messages/:messageId",ratelimit.authIpLimiter,middleware.authMiddleware,controller.deleteMessage)
+router.get("/history/:userId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.getHistory)
+router.patch("/read/:userId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.markedReadPatch)
+router.patch("/delete/:messageId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.deleteMessagePatch)
+router.delete("/messages/:messageId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.deleteMessage)
 
-router.post("/upload",ratelimit.authIpLimiter,middleware.authMiddleware,upload.single("file"),controller.uploadFilePost)
+router.post("/upload", ratelimit.authIpLimiter, middleware.authMiddleware, upload.single("file"), controller.uploadFilePost)
+
+// ——— GROUP CHAT Routes ———
+// Thứ tự quan trọng: /pinned phải trước /:msgId để tránh conflict
+router.get("/groups/:groupId/messages/pinned", ratelimit.authIpLimiter, middleware.authMiddleware, controller.getGroupPinnedMessages)
+router.get("/groups/:groupId/messages", ratelimit.authIpLimiter, middleware.authMiddleware, controller.getGroupMessages)
+router.post("/groups/:groupId/messages", ratelimit.authIpLimiter, middleware.authMiddleware, controller.sendGroupMessage)
+router.patch("/groups/:groupId/messages/:msgId/pin", ratelimit.authIpLimiter, middleware.authMiddleware, controller.pinGroupMessage)
+router.delete("/groups/:groupId/messages/:msgId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.deleteOrRecallGroupMessage)
+router.post("/groups/:groupId/upload", ratelimit.authIpLimiter, middleware.authMiddleware, upload.single("file"), controller.uploadGroupChatFile)
 
 export const chatRoutes = router
