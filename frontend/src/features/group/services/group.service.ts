@@ -13,6 +13,7 @@ export interface GroupData {
   name: string;
   description?: string;
   avatarUrl?: string;
+  coverUrl?: string;
   visibility: GroupVisibility;
   memberCount: number;
   createdAt: string;
@@ -65,6 +66,7 @@ export interface CreateGroupPayload {
   name: string;
   description?: string;
   avatarUrl?: string;
+  coverUrl?: string;
   visibility?: GroupVisibility;
 }
 
@@ -72,6 +74,7 @@ export interface UpdateGroupPayload {
   name?: string;
   description?: string;
   avatarUrl?: string;
+  coverUrl?: string;
   visibility?: GroupVisibility;
 }
 
