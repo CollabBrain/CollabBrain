@@ -111,7 +111,7 @@ const MessageBubble = ({
           {/* Message Content */}
           {message.isRecalled ? (
             <span className="italic opacity-80">{message.content}</span>
-          ) : message.type === 'image' || message.type === 'IMAGE' ? (
+          ) : message.type === 'image' || (message.type as string) === 'IMAGE' ? (
             <div className="mt-1 mb-1">
               <img
                 src={message.content}
@@ -121,7 +121,7 @@ const MessageBubble = ({
                 loading="lazy"
               />
             </div>
-          ) : message.type === 'file' || message.type === 'FILE' ? (
+          ) : message.type === 'file' || (message.type as string) === 'FILE' ? (
             <a
               href={message.content}
               target="_blank"

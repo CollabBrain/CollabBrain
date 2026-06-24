@@ -10,6 +10,7 @@ import {
 } from "../../repositories/client/document.repo";
 import { findGroupById, findGroupMember } from "../../repositories/client/group.repo";
 import { uploadToSupabase } from "../../helpers/upload";
+import { ingestDocumentService } from "./rag.service";
 
 // ============================================================
 // Helpers
@@ -65,6 +66,11 @@ export const uploadPersonalDocumentService = async (
     uploadedBy: userId,
   });
 
+  // Tự động kích hoạt phân tích RAG bất đồng bộ (fire-and-forget)
+  ingestDocumentService(document.id).catch((err) =>
+    console.error(`Tự động phân tích RAG thất bại cho tài liệu cá nhân ${document.id}:`, err)
+  );
+
   return {
     data: document,
     message: "Upload tài liệu cá nhân thành công",
@@ -109,6 +115,11 @@ export const uploadGroupDocumentService = async (
     groupId,
     uploadedBy: userId,
   });
+
+  // Tự động kích hoạt phân tích RAG bất đồng bộ (fire-and-forget)
+  ingestDocumentService(document.id).catch((err) =>
+    console.error(`Tự động phân tích RAG thất bại cho tài liệu nhóm ${document.id}:`, err)
+  );
 
   return {
     data: document,
