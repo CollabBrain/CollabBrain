@@ -64,3 +64,28 @@ export const searchUsersApi = (query: string) =>
   axiosInstance.get<ApiResponse<SearchUsersResponse>>('/chat/users/search', {
     params: { q: query },
   });
+
+// ========== Pin & File Upload APIs ==========
+
+/** Lấy danh sách tin nhắn ghim của conversation */
+export const getPinnedMessagesApi = (conversationId: string) =>
+  axiosInstance.get<ApiResponse<Message[]>>(
+    `/chat/conversations/${conversationId}/messages/pinned`
+  );
+
+/** Ghim / Bỏ ghim tin nhắn 1-1 */
+export const togglePinMessageApi = (messageId: string) =>
+  axiosInstance.patch<ApiResponse<Message>>(`/chat/messages/${messageId}/pin`);
+
+/** Upload file/ảnh cho chat 1-1 */
+export const uploadFileApi = (file: File) => {
+  const formData = new FormData();
+  formData.append('file', file);
+  return axiosInstance.post<ApiResponse<{ url: string; original_filename: string; resource_type: string; size?: number }>>(
+    '/chat/upload',
+    formData,
+    {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }
+  );
+};

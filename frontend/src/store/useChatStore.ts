@@ -20,6 +20,9 @@ interface ChatState {
   messagePage: Record<string, number>;
   hasMoreMessages: Record<string, boolean>;
 
+  // Pinned messages
+  pinnedMessagesByConversation: Record<string, Message[]>;
+
   // ——— Actions ———
   setConversations: (convs: Conversation[]) => void;
   addOrUpdateConversation: (conv: Conversation) => void;
@@ -36,6 +39,9 @@ interface ChatState {
   setHasMore: (conversationId: string, hasMore: boolean) => void;
   incrementPage: (conversationId: string) => void;
   resetMessages: (conversationId: string) => void;
+
+  setPinnedMessages: (conversationId: string, messages: Message[]) => void;
+  togglePinnedMessage: (conversationId: string, message: Message, isPinned: boolean) => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -46,6 +52,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   onlineUsers: {},
   messagePage: {},
   hasMoreMessages: {},
+  pinnedMessagesByConversation: {},
 
   setConversations: (convs) =>
     set((state) => {
@@ -171,6 +178,28 @@ export const useChatStore = create<ChatState>((set, get) => ({
       messagePage: { ...state.messagePage, [conversationId]: 1 },
       hasMoreMessages: { ...state.hasMoreMessages, [conversationId]: true },
     })),
+
+  setPinnedMessages: (conversationId, messages) =>
+    set((state) => ({
+      pinnedMessagesByConversation: { ...state.pinnedMessagesByConversation, [conversationId]: messages }
+    })),
+
+  togglePinnedMessage: (conversationId, message, isPinned) =>
+    set((state) => {
+      const currentPins = state.pinnedMessagesByConversation[conversationId] || [];
+      const currentMsgs = state.messagesByConversation[conversationId] || [];
+      
+      const newPins = isPinned 
+        ? (currentPins.some(m => m.id === message.id) ? currentPins : [message, ...currentPins])
+        : currentPins.filter(m => m.id !== message.id);
+        
+      const newMsgs = currentMsgs.map(m => m.id === message.id ? { ...m, isPinned } : m);
+
+      return { 
+        pinnedMessagesByConversation: { ...state.pinnedMessagesByConversation, [conversationId]: newPins },
+        messagesByConversation: { ...state.messagesByConversation, [conversationId]: newMsgs }
+      };
+    }),
 }));
 
 // ——— Selectors ———

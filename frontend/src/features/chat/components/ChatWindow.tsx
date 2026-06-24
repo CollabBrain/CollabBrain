@@ -17,6 +17,14 @@ import {
   ChevronDown,
   Trash2,
   RotateCcw,
+  Pin,
+  X,
+  Paperclip,
+  CornerUpLeft,
+  FileText,
+  Image as ImageIcon,
+  ChevronUp,
+  Ban
 } from 'lucide-react';
 import { useChatStore, selectActiveMessages } from '../../../store/useChatStore';
 import {
@@ -27,6 +35,9 @@ import {
   useEmitTyping,
   useRecallMessage,
   useDeleteMessage,
+  usePinnedMessages,
+  useTogglePinMessage,
+  useUploadChatFile
 } from '../hooks/useChat';
 import MessageBubble, { TypingIndicator, DateDivider } from './MessageBubble';
 import { cn } from '../../../lib/utils';
@@ -34,6 +45,7 @@ import type { Conversation, ChatUser, Message } from '../../../types/chat.types'
 
 // Stable empty array reference to prevent re-render loops
 const EMPTY_STRINGS: string[] = [];
+const EMPTY_MESSAGES: Message[] = [];
 
 interface ChatWindowProps {
   conversation: Conversation;
@@ -147,9 +159,13 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   const [isTypingLocally, setIsTypingLocally] = useState(false);
   const [contextMenu, setContextMenu] = useState<ContextMenu | null>(null);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [selectedFile, setSelectedFile] = useState<{ file: File; type: 'image' | 'file'; previewUrl?: string } | null>(null);
+  const [expandedPins, setExpandedPins] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const typingTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   // Sentinel cho infinite scroll — khi hiện trong viewport → load thêm
@@ -170,6 +186,11 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   const emitTyping = useEmitTyping();
   const recallMutation = useRecallMessage();
   const deleteMutation = useDeleteMessage();
+  const pinMutation = useTogglePinMessage();
+  const uploadMutation = useUploadChatFile();
+
+  usePinnedMessages(conversation.id);
+  const pinnedMessages = useChatStore((s) => s.pinnedMessagesByConversation[conversation.id] ?? EMPTY_MESSAGES);
 
   const other = getOtherParticipant(conversation, currentUserId);
   const isOtherOnline = other ? (onlineUsers[other.id] ?? other.isOnline ?? false) : false;
@@ -179,6 +200,15 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   }, []);
+
+  const handleScrollToMessage = (messageId: string) => {
+    const el = document.getElementById(`msg-${messageId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('animate-pulse');
+      setTimeout(() => el.classList.remove('animate-pulse'), 2000);
+    }
+  };
 
   // Đánh dấu đã đọc khi mở
   const markedRef = useRef<string>('');
@@ -263,16 +293,38 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   // Send
   const handleSend = useCallback(async () => {
     const content = inputValue.trim();
-    if (!content) return;
+    if (!content && !selectedFile) return;
+
+    let payloadType: 'text' | 'image' | 'file' = 'text';
+    let finalContent = content;
+
+    // Nếu có file upload
+    if (selectedFile) {
+      payloadType = selectedFile.type;
+      try {
+        const res = await uploadMutation.mutateAsync(selectedFile.file);
+        const data = res.data.data;
+        if (data) {
+          finalContent = data.url;
+        }
+      } catch (error) {
+        console.error("Upload error:", error);
+        return;
+      }
+    }
 
     setInputValue('');
+    setSelectedFile(null);
+    const replyToId = replyingTo?.id;
+    setReplyingTo(null);
+
     if (isTypingLocally) {
       setIsTypingLocally(false);
       emitTyping(conversation.id, false);
       if (typingTimerRef.current) clearTimeout(typingTimerRef.current);
     }
 
-    const payload = { conversationId: conversation.id, content, type: 'text' as const };
+    const payload = { conversationId: conversation.id, content: finalContent, type: payloadType, replyToId };
     const sentViaSocket = emitMessage(payload, currentUserId);
 
     if (!sentViaSocket) {
@@ -284,8 +336,8 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
     }
     scrollToBottom();
   }, [
-    inputValue, isTypingLocally, emitTyping, conversation.id,
-    emitMessage, currentUserId, sendMsgMutation, scrollToBottom,
+    inputValue, selectedFile, replyingTo, isTypingLocally, emitTyping, conversation.id,
+    emitMessage, currentUserId, sendMsgMutation, scrollToBottom, uploadMutation
   ]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -315,11 +367,83 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
     closeContextMenu();
   };
 
+  const handleReply = () => {
+    if (!contextMenu) return;
+    const msg = messages.find(m => m.id === contextMenu.messageId);
+    if (msg) setReplyingTo(msg);
+    closeContextMenu();
+    textareaRef.current?.focus();
+  };
+
+  const handleTogglePin = () => {
+    if (!contextMenu) return;
+    pinMutation.mutate({ messageId: contextMenu.messageId, conversationId: conversation.id });
+    closeContextMenu();
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const isImage = file.type.startsWith('image/');
+    setSelectedFile({
+      file,
+      type: isImage ? 'image' : 'file',
+      previewUrl: isImage ? URL.createObjectURL(file) : undefined
+    });
+    // Reset file input
+    if (fileInputRef.current) fileInputRef.current.value = '';
+    textareaRef.current?.focus();
+  };
+
   if (!other) return null;
 
   return (
     <div className="flex flex-col h-full bg-background relative" onClick={closeContextMenu}>
       <ChatHeader other={other} isOnline={isOtherOnline} onBack={onBackMobile} />
+
+      {/* Pinned Messages Bar */}
+      {pinnedMessages.length > 0 && (
+        <div className="bg-primary/5 border-b border-primary/10 px-4 py-2 sticky top-0 z-10">
+          <div className="flex items-center gap-2">
+            <Pin className="w-3.5 h-3.5 text-primary shrink-0" />
+            <div 
+              className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity"
+              onClick={() => handleScrollToMessage(pinnedMessages[0].id)}
+            >
+              <p className="text-xs font-bold text-primary">{pinnedMessages.length} tin nhắn đã ghim</p>
+              <p className="text-xs text-primary/80 truncate mt-0.5">
+                {pinnedMessages[0].senderId === currentUserId ? 'Bạn' : other.name}: {pinnedMessages[0].isRecalled ? <span className="inline-flex items-center gap-1 align-text-bottom"><Ban className="w-3 h-3" /> Tin nhắn đã được thu hồi</span> : pinnedMessages[0].content || '[File/Ảnh]'}
+              </p>
+            </div>
+            <button onClick={() => setExpandedPins(!expandedPins)} className="p-1 text-primary hover:bg-primary/10 transition-colors rounded">
+              {expandedPins ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            </button>
+          </div>
+
+          {expandedPins && (
+            <div className="mt-2 space-y-2 max-h-48 overflow-y-auto pr-1">
+              {pinnedMessages.map(msg => (
+                <div key={msg.id} className="flex items-start gap-2 p-2 bg-background rounded-xl border border-primary/10 shadow-sm">
+                  <div className="flex-1 min-w-0 cursor-pointer hover:opacity-80 transition-opacity" onClick={() => handleScrollToMessage(msg.id)}>
+                    <p className="text-xs font-bold text-foreground">{msg.senderId === currentUserId ? 'Bạn' : other.name}</p>
+                    <p className="text-xs text-muted-foreground truncate mt-0.5">
+                      {msg.isRecalled ? <span className="inline-flex items-center gap-1 align-text-bottom"><Ban className="w-3 h-3" /> Thu hồi</span> : msg.content || '[File/Ảnh]'}
+                    </p>
+                  </div>
+                  <button 
+                    onClick={(e) => { e.stopPropagation(); pinMutation.mutate({ messageId: msg.id, conversationId: conversation.id }); }} 
+                    disabled={pinMutation.isPending}
+                    className="p-1.5 bg-primary/10 text-primary hover:bg-rose-100 hover:text-rose-500 border border-primary/20 cursor-pointer rounded-md shrink-0 flex items-center justify-center transition-colors disabled:opacity-50" 
+                    title="Bỏ ghim"
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Messages */}
       <div
@@ -407,40 +531,104 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
       {/* Input */}
       <form
         onSubmit={(e: FormEvent) => { e.preventDefault(); handleSend(); }}
-        className="px-4 py-3 border-t border-border bg-card flex items-end gap-3 shrink-0"
+        className="px-4 py-3 border-t border-border bg-card flex flex-col gap-2 shrink-0 relative"
       >
-        <div className="flex-1 relative">
-          <textarea
-            id="message-input"
-            ref={textareaRef}
-            rows={1}
-            value={inputValue}
-            onChange={(e) => {
-              setInputValue(e.target.value);
-              handleTypingStart();
-            }}
-            onKeyDown={handleKeyDown}
-            placeholder={`Nhắn tin cho ${other.name}...`}
-            className="w-full resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 placeholder:text-muted-foreground transition-all max-h-[120px] leading-relaxed"
-          />
-        </div>
+        {/* Reply Preview */}
+        {replyingTo && (
+          <div className="flex items-center justify-between bg-muted/50 rounded-lg px-3 py-2 border-l-4 border-primary/50 text-sm animate-in fade-in slide-in-from-bottom-2">
+            <div className="flex flex-col overflow-hidden">
+              <span className="text-primary font-medium text-xs flex items-center gap-1.5">
+                <CornerUpLeft className="h-3.5 w-3.5" />
+                Đang trả lời {replyingTo.senderId === currentUserId ? 'chính bạn' : (other?.name || 'User')}
+              </span>
+              <span className="text-muted-foreground truncate w-full pr-4">{replyingTo.content || '[File/Ảnh]'}</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReplyingTo(null)}
+              className="h-6 w-6 rounded-full hover:bg-background/80 flex items-center justify-center shrink-0 transition-colors"
+            >
+              <X className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+        )}
 
-        <button
-          id="send-message-btn"
-          type="submit"
-          disabled={!inputValue.trim() || sendMsgMutation.isPending}
-          className={cn(
-            'h-10 w-10 rounded-full flex items-center justify-center transition-all duration-150 shrink-0',
-            inputValue.trim()
-              ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg scale-100 hover:scale-105'
-              : 'bg-muted text-muted-foreground cursor-not-allowed'
-          )}
-        >
-          {sendMsgMutation.isPending
-            ? <Loader2 className="h-4 w-4 animate-spin" />
-            : <Send className="h-4 w-4" />
-          }
-        </button>
+        {/* File Preview */}
+        {selectedFile && (
+          <div className="flex items-center justify-between bg-primary/5 rounded-lg px-3 py-2 border border-primary/20 text-sm animate-in fade-in">
+            <div className="flex items-center gap-3 overflow-hidden">
+              {selectedFile.type === 'image' && selectedFile.previewUrl ? (
+                <img src={selectedFile.previewUrl} alt="Preview" className="h-10 w-10 object-cover rounded-md border border-border" />
+              ) : (
+                <div className="h-10 w-10 flex items-center justify-center bg-background rounded-md border border-border">
+                  <FileText className="h-5 w-5 text-muted-foreground" />
+                </div>
+              )}
+              <div className="flex flex-col overflow-hidden">
+                <span className="font-medium truncate max-w-[200px]">{selectedFile.file.name}</span>
+                <span className="text-xs text-muted-foreground">{(selectedFile.file.size / 1024).toFixed(1)} KB</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setSelectedFile(null)}
+              className="h-8 w-8 rounded-full hover:bg-background flex items-center justify-center text-muted-foreground transition-colors"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+        )}
+
+        <div className="flex items-end gap-2 w-full">
+          <input
+            type="file"
+            ref={fileInputRef}
+            className="hidden"
+            onChange={handleFileChange}
+            accept="*/*"
+          />
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="h-10 w-10 rounded-full flex items-center justify-center hover:bg-muted text-muted-foreground hover:text-foreground transition-colors shrink-0"
+            title="Đính kèm file"
+          >
+            <Paperclip className="h-5 w-5" />
+          </button>
+          
+          <div className="flex-1 relative">
+            <textarea
+              id="message-input"
+              ref={textareaRef}
+              rows={1}
+              value={inputValue}
+              onChange={(e) => {
+                setInputValue(e.target.value);
+                handleTypingStart();
+              }}
+              onKeyDown={handleKeyDown}
+              placeholder={`Nhắn tin cho ${other?.name}...`}
+              className="w-full resize-none rounded-2xl border border-input bg-background px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-1 placeholder:text-muted-foreground transition-all max-h-[120px] leading-relaxed"
+            />
+          </div>
+
+          <button
+            id="send-message-btn"
+            type="submit"
+            disabled={(!inputValue.trim() && !selectedFile) || sendMsgMutation.isPending || uploadMutation.isPending}
+            className={cn(
+              'h-10 w-10 rounded-full flex items-center justify-center transition-all duration-150 shrink-0',
+              (inputValue.trim() || selectedFile)
+                ? 'bg-primary text-primary-foreground hover:bg-primary/90 shadow-md hover:shadow-lg scale-100 hover:scale-105'
+                : 'bg-muted text-muted-foreground cursor-not-allowed'
+            )}
+          >
+            {(sendMsgMutation.isPending || uploadMutation.isPending)
+              ? <Loader2 className="h-4 w-4 animate-spin" />
+              : <Send className="h-4 w-4" />
+            }
+          </button>
+        </div>
       </form>
 
       {/* Context Menu */}
@@ -452,6 +640,30 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
             style={{ top: contextMenu.y, left: contextMenu.x }}
             onClick={(e) => e.stopPropagation()}
           >
+            <button
+              onClick={handleReply}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-muted transition-colors"
+            >
+              <CornerUpLeft className="h-4 w-4" />
+              Trả lời
+            </button>
+            <button
+              onClick={handleTogglePin}
+              disabled={pinMutation.isPending}
+              className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm hover:bg-muted transition-colors disabled:opacity-50"
+            >
+              {messages.find(m => m.id === contextMenu.messageId)?.isPinned ? (
+                <>
+                  <Pin className="h-4 w-4 text-muted-foreground" />
+                  Bỏ ghim
+                </>
+              ) : (
+                <>
+                  <Pin className="h-4 w-4 text-amber-500 fill-amber-500/20" />
+                  Ghim tin nhắn
+                </>
+              )}
+            </button>
             {contextMenu.isMine && (
               <button
                 onClick={handleRecall}

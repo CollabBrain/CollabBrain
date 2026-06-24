@@ -232,6 +232,9 @@ const DiscoverGroupCard = ({ group, onJoined }: { group: GroupData; onJoined?: (
       className="bg-white rounded-2xl overflow-hidden border border-slate-100 hover:border-slate-200 hover:shadow-md transition-all duration-200 group cursor-pointer"
     >
       <div className={`h-20 bg-gradient-to-br ${coverColor} relative`}>
+        {group.coverUrl && (
+          <img src={group.coverUrl} alt="cover" className="absolute inset-0 w-full h-full object-cover" />
+        )}
         <div className="absolute inset-0 bg-black/10" />
       </div>
 
@@ -302,7 +305,11 @@ const InvitationCard = ({ inv, onAccepted, onRejected }: {
   return (
     <div className="flex flex-col gap-2 p-3 bg-amber-50 rounded-xl border border-amber-100">
       <div className="flex items-center gap-2">
-        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${coverColor} shrink-0`} />
+        <div className={`w-8 h-8 rounded-lg bg-gradient-to-br ${coverColor} shrink-0 overflow-hidden relative`}>
+          {inv.group.avatarUrl && (
+            <img src={inv.group.avatarUrl} alt={inv.group.name} className="absolute inset-0 w-full h-full object-cover" />
+          )}
+        </div>
         <div className="min-w-0">
           <p className="text-xs font-extrabold text-slate-800 truncate">{inv.group.name}</p>
           <p className="text-[10px] text-slate-400">Được mời bởi {inv.invitedBy?.name || 'Ai đó'}</p>
@@ -546,15 +553,18 @@ const GroupsPage = () => {
                       >
                         {/* Cover */}
                         <div className={`h-24 bg-gradient-to-br ${coverColor} relative`}>
+                          {group.coverUrl && (
+                            <img src={group.coverUrl} alt="cover" className="absolute inset-0 w-full h-full object-cover" />
+                          )}
                           <div className="absolute inset-0 bg-black/10" />
                           {group.myRole && (
                             <span className="absolute top-2 right-2">
                               <RoleBadge role={group.myRole} />
                             </span>
                           )}
-                          <div className="absolute -bottom-5 left-4 w-10 h-10 rounded-xl bg-white flex items-center justify-center shadow-md border-2 border-white">
+                          <div className="absolute -bottom-5 left-4 w-10 h-10 rounded-full bg-white flex items-center justify-center shadow-md border-2 border-white overflow-hidden">
                             {group.avatarUrl ? (
-                              <img src={group.avatarUrl} alt={group.name} className="w-full h-full rounded-xl object-cover" />
+                              <img src={group.avatarUrl} alt={group.name} className="w-full h-full object-cover" />
                             ) : (
                               <span className="text-sm font-black text-indigo-600">{(group.name || 'G').charAt(0)}</span>
                             )}

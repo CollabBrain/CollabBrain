@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom';
 import { useFriends } from '../hooks/useFriends';
 import {
@@ -6,7 +6,7 @@ import {
   UserPlus, Search, Eye, Trash2, Globe, Lock, UserCheck,
   BookOpen, FileText, CheckCircle, X, Bell, Upload, GraduationCap,
   Hash, ClipboardList, ChevronDown, Clock, Loader2, AlertCircle, RefreshCw,
-  MoreVertical, Download, Image as ImageIcon, File as FileIcon, CheckCircle2, FileSpreadsheet, FileIcon as FilePowerpoint
+  MoreVertical, Download, Image as ImageIcon, File as FileIcon, CheckCircle2, FileSpreadsheet, FileIcon as FilePowerpoint, Camera
 } from 'lucide-react';
 import {
   uploadGroupDocumentApi,
@@ -37,6 +37,12 @@ import type {
   JoinRequestData,
   UpdateGroupPayload,
 } from '../features/group/services/group.service';
+import AvatarUpload from '../components/common/AvatarUpload';
+import axiosInstance from '../services/axiosInstance';
+import { useAuthStore } from '../store/useAuthStore';
+import GroupChatTab from '../features/group/components/GroupChatTab';
+import { ErrorBoundary } from '../components/ErrorBoundary';
+import { initSocket } from '../socket/socket';
 
 // ——— Types
 type ActiveTab = 'chat' | 'members' | 'documents' | 'settings';
@@ -637,12 +643,66 @@ const SettingsTab = ({
     description: group.description || '',
     visibility: group.visibility,
     avatarUrl: group.avatarUrl,
+    coverUrl: group.coverUrl,
   });
   const [saving, setSaving] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [saveError, setSaveError] = useState('');
   const [showDangerConfirm, setShowDangerConfirm] = useState(false);
   const [deleting, setDeleting] = useState(false);
+
+  const coverFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverUploadError, setCoverUploadError] = useState<string | null>(null);
+
+  const handleCoverClick = () => {
+    if (!isUploadingCover) {
+      coverFileInputRef.current?.click();
+    }
+  };
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.value ? e.target.files : null;
+    if (!files || files.length === 0) return;
+
+    const file = files[0];
+    if (!file.type.startsWith("image/")) {
+      setCoverUploadError("Vui lòng chọn một tệp hình ảnh hợp lệ.");
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      setCoverUploadError("Kích thước ảnh không được vượt quá 10MB.");
+      return;
+    }
+
+    setIsUploadingCover(true);
+    setCoverUploadError(null);
+
+    const formData = new FormData();
+    formData.append("image", file);
+
+    try {
+      const response = await axiosInstance.post<{ url: string }>(
+        "/upload/image",
+        formData,
+        { headers: { "Content-Type": "multipart/form-data" } }
+      );
+
+      if (response.data && response.data.url) {
+        setForm(prev => ({ ...prev, coverUrl: response.data.url }));
+      } else {
+        throw new Error("Không nhận được URL ảnh từ server");
+      }
+    } catch (err: any) {
+      console.error("Lỗi upload ảnh bìa:", err);
+      setCoverUploadError(err?.response?.data?.message || err.message || "Tải ảnh bìa lên thất bại");
+    } finally {
+      setIsUploadingCover(false);
+      if (coverFileInputRef.current) {
+        coverFileInputRef.current.value = "";
+      }
+    }
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -681,19 +741,58 @@ const SettingsTab = ({
           <p className="text-xs text-slate-400 mt-0.5">Cập nhật tên, mô tả và ảnh đại diện nhóm</p>
         </div>
         <div className="p-6 space-y-5">
-          {/* Avatar section */}
-          <div className="flex items-center gap-4">
-            <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${getCoverColor(group.id)} flex items-center justify-center text-white text-2xl font-black shadow-lg`}>
-              {group.avatarUrl
-                ? <img src={group.avatarUrl} alt={group.name} className="w-full h-full rounded-2xl object-cover" />
-                : getInitials(group.name)
-              }
+          {/* Cover section */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-600">Ảnh bìa nhóm</label>
+            <div className="h-32 sm:h-44 bg-gradient-to-r from-violet-600 via-indigo-600 to-pink-500 rounded-2xl relative overflow-hidden group">
+              {form.coverUrl ? (
+                <img src={form.coverUrl} alt="Cover Preview" className="w-full h-full object-cover" />
+              ) : (
+                <div className="absolute inset-0 bg-black/10 mix-blend-overlay" />
+              )}
+              
+              <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                <button
+                  type="button"
+                  onClick={handleCoverClick}
+                  disabled={isUploadingCover}
+                  className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-xl border border-white/30 backdrop-blur-md text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isUploadingCover ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Camera className="h-3.5 w-3.5" />}
+                  {form.coverUrl ? 'Thay đổi ảnh bìa' : 'Tải lên ảnh bìa'}
+                </button>
+                <input
+                  type="file"
+                  ref={coverFileInputRef}
+                  onChange={handleCoverChange}
+                  accept="image/*"
+                  className="hidden"
+                  disabled={isUploadingCover}
+                />
+              </div>
+
+              {coverUploadError && (
+                <div className="absolute bottom-2 left-2 right-2 bg-rose-600/90 backdrop-blur-sm text-white px-3 py-1.5 rounded-lg text-xs text-center font-semibold">
+                  {coverUploadError}
+                </div>
+              )}
             </div>
-            <div>
-              <button className="text-sm font-semibold text-indigo-600 hover:text-indigo-700 border border-indigo-200 hover:border-indigo-400 hover:bg-indigo-50 px-4 py-2 rounded-xl transition-all cursor-pointer bg-transparent">
-                Đổi ảnh bìa
-              </button>
-              <p className="text-xs text-slate-400 mt-1.5">PNG, JPG · Tối đa 5MB</p>
+          </div>
+
+          {/* Avatar section */}
+          <div className="space-y-2">
+            <label className="block text-xs font-bold text-slate-600">Ảnh đại diện nhóm</label>
+            <div className="flex items-center gap-4">
+              <AvatarUpload
+                value={form.avatarUrl}
+                onChange={(url) => setForm({ ...form, avatarUrl: url })}
+                nameInitial={getInitials(group.name)}
+                className="w-16 h-16 rounded-full border-4 border-white shadow-md ring-1 ring-slate-100"
+              />
+              <div>
+                <p className="text-sm font-semibold text-slate-700">Đổi ảnh đại diện</p>
+                <p className="text-xs text-slate-400 mt-1">PNG, JPG · Tối đa 10MB</p>
+              </div>
             </div>
           </div>
 
@@ -846,6 +945,19 @@ const GroupWorkspacePage = () => {
   const [searchParams] = useSearchParams();
   const initialTab = (searchParams.get('tab') as ActiveTab) || 'members';
   const [activeTab, setActiveTab] = useState<ActiveTab>(initialTab);
+
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const [myUserId, setMyUserId] = useState('');
+
+  // Parse userId from JWT token
+  useEffect(() => {
+    if (!accessToken) return;
+    initSocket(accessToken);
+    try {
+      const payload = JSON.parse(atob(accessToken.split('.')[1]));
+      setMyUserId(payload.id ?? payload.sub ?? payload.userId ?? '');
+    } catch { /* ignore */ }
+  }, [accessToken]);
 
   // ——— Data state
   const [group, setGroup] = useState<GroupWithRole | null>(null);
@@ -1033,11 +1145,13 @@ const GroupWorkspacePage = () => {
   return (
     <div className="min-h-screen bg-slate-50 font-sans">
       {/* ——— Cover Banner ——— */}
-      <div
-        className={`h-52 md:h-64 relative overflow-hidden bg-gradient-to-br ${coverColor}`}
-      >
-        <div className="absolute inset-0 opacity-10"
-          style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+      <div className={`h-52 md:h-64 relative overflow-hidden bg-gradient-to-br ${coverColor}`}>
+        {group.coverUrl ? (
+          <img src={group.coverUrl} alt="Cover" className="w-full h-full object-cover" />
+        ) : (
+          <div className="absolute inset-0 opacity-10"
+            style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px), radial-gradient(circle at 80% 20%, white 1px, transparent 1px)', backgroundSize: '60px 60px' }} />
+        )}
         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/30" />
 
         {/* Back button */}
@@ -1064,7 +1178,7 @@ const GroupWorkspacePage = () => {
           {/* Avatar + Info row */}
           <div className="flex flex-col sm:flex-row gap-4 relative sm:items-start">
             {/* Group Avatar */}
-            <div className={`w-24 h-24 md:w-28 md:h-28 rounded-2xl bg-gradient-to-br ${coverColor} flex items-center justify-center text-white text-4xl font-black shrink-0 border-4 border-white shadow-xl ring-2 ring-white -mt-10 sm:-mt-14 z-10 overflow-hidden`}>
+            <div className={`w-24 h-24 md:w-28 md:h-28 rounded-full bg-gradient-to-br ${coverColor} flex items-center justify-center text-white text-4xl font-black shrink-0 border-4 border-white shadow-xl ring-2 ring-white -mt-10 sm:-mt-14 z-10 overflow-hidden`}>
               {group.avatarUrl
                 ? <img src={group.avatarUrl} alt={group.name} className="w-full h-full object-cover" />
                 : getInitials(group.name)
@@ -1243,7 +1357,17 @@ const GroupWorkspacePage = () => {
           </div>
         ) : (
           <>
-            {activeTab === 'chat' && isMember && <ChatTab group={group} canContribute={canContribute} />}
+            {activeTab === 'chat' && isMember && myUserId && (
+              <ErrorBoundary fallbackLabel="Lỗi tải Group Chat">
+                <GroupChatTab
+                  groupId={groupId!}
+                  groupName={group.name}
+                  myUserId={myUserId}
+                  myRole={membershipStatus as 'OWNER' | 'MEMBER' | 'VIEWER'}
+                  members={members}
+                />
+              </ErrorBoundary>
+            )}
             {activeTab === 'members' && (
               <MembersTab
                 group={group}

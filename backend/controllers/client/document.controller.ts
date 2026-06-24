@@ -22,6 +22,7 @@ export const uploadPersonalDocumentPost = async (req: Request, res: Response) =>
         message: "Không tìm thấy file để upload",
       });
     }
+    file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
     const result = await uploadPersonalDocumentService(file, userId);
     res.status(200).json({
       code: 200,
@@ -48,6 +49,7 @@ export const uploadGroupDocumentPost = async (req: Request, res: Response) => {
         message: "Không tìm thấy file để upload",
       });
     }
+    file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
     const result = await uploadGroupDocumentService(file, groupId, userId);
     res.status(200).json({
       code: 200,
@@ -190,7 +192,7 @@ export const downloadDocumentGet = async (req: Request, res: Response) => {
 
     response.data.pipe(res);
   } catch (error: any) {
-    console.error("Lỗi khi tải file từ Cloudinary:", error?.message || error);
-    res.status(500).json({ message: "Lỗi khi tải file từ Cloudinary" });
+    console.error("Lỗi khi tải file từ Supabase:", error?.message || error);
+    res.status(500).json({ message: "Lỗi khi tải file từ Supabase" });
   }
 };

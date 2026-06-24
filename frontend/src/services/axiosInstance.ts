@@ -3,10 +3,7 @@ import { API_BASE_URL, TOKEN_KEY, REFRESH_TOKEN_KEY } from '../constants';
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  timeout: 30000,
 });
 
 let isRefreshing = false;

@@ -1,5 +1,19 @@
 import { Request, Response } from "express";
-import { deleteMessageService, getChatHistoryService, markReadService, uploadToSupabasePostService, recallMessageService } from "../../services/client/chat.service";
+import { 
+  deleteMessageService, 
+  getChatHistoryService, 
+  markReadService, 
+  uploadToSupabasePostService, 
+  recallMessageService, 
+  sendGroupMessageService, 
+  getGroupHistoryService, 
+  togglePinMessageService,
+  getPinnedMessagesService,
+  togglePinChatMessageService, 
+  getPinnedChatMessagesService, 
+  recallGroupMessageService, 
+  uploadGroupChatFileService 
+} from "../../services/client/chat.service";
 import prisma from "../../config/prisma";
 import { getListFriend } from "../../repositories/client/friend.repo";
 import { getMessageBetweenUsers, markMessageAsRead } from "../../repositories/client/chat.repo";
@@ -71,10 +85,11 @@ export const uploadFilePost = async (req: Request, res: Response) => {
       data: result.data,
       message: result.message
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Upload error:", error.message);
     res.status(400).json({
       code: 400,
-      message: "Upload thất bại"
+      message: `Upload thất bại: ${error.message}`
     });
   }
 };
@@ -520,5 +535,165 @@ export const deleteMessage = async (req: Request, res: Response) => {
       code: 400,
       message: `Lỗi: ${error.message}`
     });
+  }
+};
+
+//[PATCH] /chat/messages/:msgId/pin
+export const pinChatMessage = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const msgId = req.params.msgId as string;
+    const result = await togglePinChatMessageService(msgId, myId);
+    
+    const io = req.app.get("io");
+    if (io) {
+      // Phát tới người kia
+      const targetId = result.data.senderId === myId ? result.data.receiverId : result.data.senderId;
+      if (targetId) {
+        io.to(targetId).emit("chat:message_pinned", {
+          messageId: msgId,
+          message: result.data,
+          isPinned: result.isPinned,
+          conversationId: myId // the sender of the event
+        });
+      }
+    }
+    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
+  }
+};
+
+//[GET] /chat/conversations/:conversationId/messages/pinned
+export const getPinnedChatMessages = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const targetId = req.params.conversationId as string;
+    const result = await getPinnedChatMessagesService(myId, targetId);
+    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
+  }
+};
+
+// ============================================================
+// ——— GROUP CHAT HANDLERS ———
+// ============================================================
+
+//[GET] /chat/groups/:groupId/messages?page=&limit=
+export const getGroupMessages = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const groupId = req.params.groupId as string;
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 30));
+    const result = await getGroupHistoryService(groupId, myId, page, limit);
+    return res.status(200).json({
+      code: 200,
+      message: result.message,
+      data: {
+        messages: result.data.messages,
+        total: result.data.total,
+        page,
+        hasMore: page * limit < result.data.total
+      }
+    });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
+  }
+};
+
+//[POST] /chat/groups/:groupId/messages (REST fallback)
+export const sendGroupMessage = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const groupId = req.params.groupId as string;
+    const { content, type = "text", replyToId, mentionIds } = req.body;
+    if (!content) return res.status(400).json({ code: 400, message: "Thiếu content" });
+    const result = await sendGroupMessageService(myId, groupId, content, (type as string).toUpperCase() as any, replyToId, mentionIds);
+    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
+  }
+};
+
+//[PATCH] /chat/groups/:groupId/messages/:msgId/pin  — toggle pin
+export const pinGroupMessage = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const groupId = req.params.groupId as string;
+    const msgId = req.params.msgId as string;
+    const result = await togglePinMessageService(groupId, msgId, myId);
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`group:${groupId}`).emit("group:message_pinned", {
+        groupId,
+        message: result.data,
+        isPinned: result.isPinned
+      });
+    }
+    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
+  }
+};
+
+//[GET] /chat/groups/:groupId/messages/pinned
+export const getGroupPinnedMessages = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const groupId = req.params.groupId as string;
+    const result = await getPinnedMessagesService(groupId, myId);
+    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
+  }
+};
+
+//[DELETE] /chat/groups/:groupId/messages/:msgId?type=recall|delete
+export const deleteOrRecallGroupMessage = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const groupId = req.params.groupId as string;
+    const msgId = req.params.msgId as string;
+    const type = req.query.type as string;
+    const io = req.app.get("io");
+
+    if (type === "recall") {
+      const result = await recallGroupMessageService(groupId, msgId, myId);
+      if (io) {
+        io.to(`group:${groupId}`).emit("group:message_recalled", {
+          groupId,
+          messageId: msgId,
+          message: result.data
+        });
+      }
+      return res.status(200).json({ code: 200, message: result.message, data: result.data });
+    } else {
+      const msg = await prisma.message.findFirst({ where: { id: msgId } });
+      if (!msg) return res.status(404).json({ code: 404, message: "Không tìm thấy tin nhắn" });
+      if (msg.groupId !== groupId) return res.status(400).json({ code: 400, message: "Tin nhắn không thuộc nhóm này" });
+      if (msg.senderId !== myId) return res.status(403).json({ code: 403, message: "Bạn không có quyền xóa tin nhắn này" });
+
+      await prisma.message.update({ where: { id: msgId }, data: { deletedBySender: true } });
+      if (io) {
+        io.to(`group:${groupId}`).emit("group:message_deleted", { groupId, messageId: msgId });
+      }
+      return res.status(200).json({ code: 200, message: "Xóa tin nhắn thành công" });
+    }
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
+  }
+};
+
+//[POST] /chat/groups/:groupId/upload — upload file trong group chat
+export const uploadGroupChatFile = async (req: Request, res: Response) => {
+  try {
+    const myId = (req as any).user.id;
+    const groupId = req.params.groupId as string;
+    const result = await uploadGroupChatFileService(req.file!, groupId, myId);
+    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+  } catch (error: any) {
+    return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }
 };

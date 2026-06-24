@@ -89,6 +89,8 @@ model User {
   sentInvitations     GroupInvitation[]  @relation("InvitationSender")
   sentMessages        Message[]         @relation("SentMessages")
   receivedMessages    Message[]         @relation("ReceivedMessages")
+  pinnedMessages      Message[]         @relation("PinnedMessages")
+  messageMentions     MessageMention[]
   reportsSent         Report[]          @relation("Reporter")
   reportsReceived     Report[]          @relation("ReportedUser")
   @@map("users")
@@ -99,6 +101,7 @@ model Group {
   name        String
   description String?
   avatarUrl   String?         @map("avatar_url")
+  coverUrl    String?         @map("cover_url")
   visibility  GroupVisibility  @default(PUBLIC)
   isActive    Boolean         @default(true) @map("is_active")
   isDeleted   Boolean         @default(false) @map("is_deleted")
@@ -205,13 +208,40 @@ model Message {
   createdAt  DateTime    @default(now()) @map("created_at")
   deletedBySender   Boolean   @default(false) @map("deleted_by_sender")
   deletedByReceiver Boolean   @default(false) @map("deleted_by_receiver")
-  sender   User   @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
-  receiver User?  @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
-  group    Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  // — Reply —
+  replyToId  String?   @map("reply_to_id")
+  replyTo    Message?  @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies    Message[] @relation("MessageReplies")
+
+  // — Pin (chỉ OWNER mới pin được) —
+  isPinned   Boolean   @default(false) @map("is_pinned")
+  pinnedBy   String?   @map("pinned_by")
+  pinnedAt   DateTime? @map("pinned_at")
+  pinner     User?     @relation("PinnedMessages", fields: [pinnedBy], references: [id], onDelete: SetNull)
+
+  // — Recall (thay content, không xóa record) —
+  isRecalled Boolean   @default(false) @map("is_recalled")
+
+  sender    User   @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiver  User?  @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  group     Group? @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  mentions  MessageMention[]
 
   @@index([receiverId, createdAt])  // query chat 1-1 nhanh
   @@index([groupId, createdAt])     // query chat group nhanh
+  @@index([groupId, isPinned])      // query pinned messages nhanh
   @@map("messages")
+}
+
+model MessageMention {
+  id        String  @id @default(uuid())
+  messageId String  @map("message_id")
+  userId    String  @map("user_id")
+  message   Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([messageId, userId])
+  @@map("message_mentions")
 }
 
 enum ReportStatus {
