@@ -10,7 +10,7 @@ const getEmailKey = (req: Request)=>{
 }
 export const authIpLimiter = rateLimit({
   windowMs: 15*60*1000,
-  limit: 20,
+  limit: 500,
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: tooManyRequest("Quá nhiều yêu cầu, vui lòng thử lại sau 15 phút")
