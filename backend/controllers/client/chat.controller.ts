@@ -85,10 +85,11 @@ export const uploadFilePost = async (req: Request, res: Response) => {
       data: result.data,
       message: result.message
     });
-  } catch (error) {
+  } catch (error: any) {
+    console.error("Upload error:", error.message);
     res.status(400).json({
       code: 400,
-      message: "Upload thất bại"
+      message: `Upload thất bại: ${error.message}`
     });
   }
 };
