@@ -1,6 +1,6 @@
 import { useState, memo } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, Layers } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, Layers } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import { ROUTES } from '../constants';
@@ -8,6 +8,7 @@ import { cn } from '../lib/utils';
 
 // ——— Nav items config ———
 const NAV_ITEMS = [
+  { to: ROUTES.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
   { to: ROUTES.CHAT, label: 'Chat', icon: MessageSquare },
   { to: ROUTES.DOCUMENTS, label: 'My Documents', icon: FileText },
   { to: '/flashcard', label: 'Flashcard', icon: Layers },
