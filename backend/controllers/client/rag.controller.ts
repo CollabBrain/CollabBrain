@@ -4,14 +4,14 @@ import { queryRAGService } from "../../services/client/rag.service";
 export const queryRag = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    const { question, groupId } = req.body;
+    const { question, groupId, conversationId } = req.body;
     if (!question || typeof question !== "string") {
       return res.status(400).json({
         code: 400,
         message: "Định dạng câu hỏi không đúng"
       });
     }
-    const ans = await queryRAGService(userId, question, { groupId });
+    const ans = await queryRAGService(userId, question, { groupId, conversationId });
     return res.status(200).json({
       code: 200,
       message: "Truy vấn RAG thành công",

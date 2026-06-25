@@ -46,7 +46,8 @@ const getDocumentTypeFromMime = (mimeType: string): DocumentType => {
  */
 export const uploadPersonalDocumentService = async (
   file: Express.Multer.File,
-  userId: string
+  userId: string,
+  conversationId?: string
 ) => {
   if (!file) throw new Error("Không tìm thấy file để upload");
 
@@ -63,6 +64,7 @@ export const uploadPersonalDocumentService = async (
     size: file.size,
     mimeType: file.mimetype,
     groupId: undefined, // tài liệu cá nhân
+    conversationId,
     uploadedBy: userId,
   });
 

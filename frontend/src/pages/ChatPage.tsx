@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
-import { MessageSquare, Sparkles, Send, Paperclip, Mic, ArrowLeft, Plus, FileText, CheckCircle } from 'lucide-react';
+import { MessageSquare, Sparkles, Send, Paperclip, Mic, ArrowLeft, Plus, FileText, CheckCircle, History, Trash2, Clock, X } from 'lucide-react';
 import { useChatStore } from '../store/useChatStore';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
@@ -214,6 +214,13 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
 
   // States quản lý trạng thái tải lịch sử chat
   const [isHistoryLoaded, setIsHistoryLoaded] = useState(false);
+  const [aiConvId, setAiConvId] = useState<string>('');
+  const [historyChats, setHistoryChats] = useState<Array<{ id: string; title: string; updatedAt: string }>>([]);
+  const [isHistoryModalOpen, setIsHistoryModalOpen] = useState(false);
+
+  const generateUUID = () => {
+    return crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2) + Date.now().toString(36);
+  };
 
   const showCustomAlert = (message: string, type: 'success' | 'error') => {
     setCustomAlert({ message, type });
@@ -235,14 +242,59 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
     };
   }>>([]);
 
+  const updateChatsList = (convId: string, currentMessages: typeof messages) => {
+    if (!currentUserId || !convId || currentMessages.length === 0) return;
+    const chatsKey = `ai_assistant_chats_${currentUserId}`;
+    try {
+      const storedChats = localStorage.getItem(chatsKey);
+      let chats: Array<{ id: string; title: string; updatedAt: string }> = storedChats ? JSON.parse(storedChats) : [];
+      const existingIndex = chats.findIndex(c => c.id === convId);
+      
+      const firstUserMsg = currentMessages.find(m => m.sender === 'user' && m.content);
+      const titleText = firstUserMsg ? (firstUserMsg.content.length > 40 ? firstUserMsg.content.slice(0, 40) + '...' : firstUserMsg.content) : 'Tài liệu mới tải lên';
+      
+      const updatedChat = {
+        id: convId,
+        title: titleText,
+        updatedAt: new Date().toISOString()
+      };
+      
+      if (existingIndex > -1) {
+        chats.splice(existingIndex, 1);
+      }
+      chats.unshift(updatedChat);
+      localStorage.setItem(chatsKey, JSON.stringify(chats));
+      setHistoryChats(chats);
+    } catch (e) {
+      console.error("Lỗi cập nhật danh sách hội thoại:", e);
+    }
+  };
+
   // 1. Tải lịch sử chat từ LocalStorage khi mount hoặc currentUserId thay đổi
   useEffect(() => {
     if (!currentUserId) return;
-    const localKey = `ai_assistant_messages_${currentUserId}`;
+    const chatsKey = `ai_assistant_chats_${currentUserId}`;
+    const lastActiveKey = `ai_assistant_last_active_id_${currentUserId}`;
     try {
-      const stored = localStorage.getItem(localKey);
-      if (stored) {
-        setMessages(JSON.parse(stored));
+      const storedChats = localStorage.getItem(chatsKey);
+      const chats = storedChats ? JSON.parse(storedChats) : [];
+      setHistoryChats(chats);
+
+      let activeId = localStorage.getItem(lastActiveKey) || '';
+      if (!activeId) {
+        if (chats.length > 0) {
+          activeId = chats[0].id;
+        } else {
+          activeId = generateUUID();
+        }
+        localStorage.setItem(lastActiveKey, activeId);
+      }
+      setAiConvId(activeId);
+
+      const messagesKey = `ai_assistant_messages_${currentUserId}_${activeId}`;
+      const storedMessages = localStorage.getItem(messagesKey);
+      if (storedMessages) {
+        setMessages(JSON.parse(storedMessages));
       } else {
         setMessages([]);
       }
@@ -255,14 +307,57 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
 
   // 2. Tự động lưu lịch sử chat vào LocalStorage mỗi khi tin nhắn thay đổi
   useEffect(() => {
-    if (!currentUserId || !isHistoryLoaded) return;
-    const localKey = `ai_assistant_messages_${currentUserId}`;
+    if (!currentUserId || !isHistoryLoaded || !aiConvId) return;
+    const localKey = `ai_assistant_messages_${currentUserId}_${aiConvId}`;
     try {
       localStorage.setItem(localKey, JSON.stringify(messages));
+      localStorage.setItem(`ai_assistant_last_active_id_${currentUserId}`, aiConvId);
+      if (messages.length > 0) {
+        updateChatsList(aiConvId, messages);
+      }
     } catch (e) {
       console.error("Lỗi lưu lịch sử chat AI vào localStorage:", e);
     }
-  }, [messages, currentUserId, isHistoryLoaded]);
+  }, [messages, currentUserId, isHistoryLoaded, aiConvId]);
+
+  const selectChatHistory = (convId: string) => {
+    if (!currentUserId) return;
+    setAiConvId(convId);
+    const messagesKey = `ai_assistant_messages_${currentUserId}_${convId}`;
+    const storedMessages = localStorage.getItem(messagesKey);
+    if (storedMessages) {
+      setMessages(JSON.parse(storedMessages));
+    } else {
+      setMessages([]);
+    }
+    setIsHistoryModalOpen(false);
+  };
+
+  const deleteChatHistory = (convId: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!currentUserId) return;
+    const chatsKey = `ai_assistant_chats_${currentUserId}`;
+    const messagesKey = `ai_assistant_messages_${currentUserId}_${convId}`;
+    try {
+      localStorage.removeItem(messagesKey);
+      const storedChats = localStorage.getItem(chatsKey);
+      let chats: Array<{ id: string; title: string; updatedAt: string }> = storedChats ? JSON.parse(storedChats) : [];
+      chats = chats.filter(c => c.id !== convId);
+      localStorage.setItem(chatsKey, JSON.stringify(chats));
+      setHistoryChats(chats);
+      
+      if (aiConvId === convId) {
+        const newId = generateUUID();
+        setAiConvId(newId);
+        setMessages([]);
+        localStorage.setItem(`ai_assistant_last_active_id_${currentUserId}`, newId);
+      }
+      showCustomAlert("Xóa lịch sử trò chuyện thành công!", "success");
+    } catch (err) {
+      console.error("Lỗi xóa lịch sử hội thoại:", err);
+      showCustomAlert("Xóa lịch sử thất bại!", "error");
+    }
+  };
 
   // Cuộn xuống cuối
   useEffect(() => {
@@ -371,7 +466,7 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
       ]);
 
       try {
-        const res = await uploadPersonalDocumentApi(attachedFile);
+        const res = await uploadPersonalDocumentApi(attachedFile, undefined, aiConvId);
         const doc = res.data.data;
         if (!doc) {
           throw new Error("Không nhận được dữ liệu tài liệu từ phản hồi");
@@ -444,7 +539,7 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
     const queryText = text || "Hãy tóm tắt nội dung chính của tài liệu này giúp tôi.";
 
     try {
-      const res = await queryRagApi(queryText);
+      const res = await queryRagApi(queryText, undefined, aiConvId);
       const answerData = res.data.data;
       if (!answerData) {
         throw new Error("Không nhận được dữ liệu từ máy chủ");
@@ -507,6 +602,9 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
     setMessages([]);
     if (currentUserId) {
       localStorage.removeItem(`ai_assistant_messages_${currentUserId}`);
+      const newId = generateUUID();
+      setAiConvId(newId);
+      localStorage.setItem(`ai_assistant_conv_id_${currentUserId}`, newId);
     }
   };
 
@@ -625,13 +723,22 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
             </div>
           </div>
 
-          <button
-            onClick={startNewChat}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 bg-slate-100/70 hover:bg-indigo-50 rounded-full border border-slate-200/50 transition-all duration-200 cursor-pointer active:scale-95"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            New Chat
-          </button>
+                  <div className="flex items-center gap-2">
+            <button
+              onClick={() => setIsHistoryModalOpen(true)}
+              className="inline-flex items-center justify-center p-2 text-slate-500 hover:text-indigo-600 bg-slate-100/70 hover:bg-indigo-50 rounded-full border border-slate-200/50 transition-all duration-200 cursor-pointer active:scale-95"
+              title="Lịch sử trò chuyện"
+            >
+              <History className="w-4 h-4" />
+            </button>
+            <button
+              onClick={startNewChat}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-bold text-slate-600 hover:text-indigo-600 bg-slate-100/70 hover:bg-indigo-50 rounded-full border border-slate-200/50 transition-all duration-200 cursor-pointer active:scale-95"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              New Chat
+            </button>
+          </div>
         </div>
 
         {/* Message Screen View */}
@@ -943,6 +1050,75 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
           )}
         </div>
       </div>
+
+      {/* Modal Lịch sử Trò chuyện */}
+      {isHistoryModalOpen && (
+        <div className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 max-w-md w-full max-h-[70vh] flex flex-col overflow-hidden">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2.5">
+                <History className="w-5 h-5 text-indigo-600" />
+                <h3 className="font-extrabold text-sm text-slate-800">Lịch sử Trò chuyện AI</h3>
+              </div>
+              <button
+                onClick={() => setIsHistoryModalOpen(false)}
+                className="p-1.5 rounded-xl hover:bg-slate-100 text-slate-400 hover:text-slate-600 transition-colors border-0 bg-transparent cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+            
+            {/* Modal Body */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2">
+              {historyChats.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-12 text-center text-slate-400">
+                  <Clock className="w-10 h-10 stroke-1 mb-2 text-slate-300" />
+                  <p className="text-xs font-semibold">Chưa có lịch sử trò chuyện nào</p>
+                </div>
+              ) : (
+                historyChats.map((chat) => (
+                  <div
+                    key={chat.id}
+                    onClick={() => selectChatHistory(chat.id)}
+                    className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all duration-200 cursor-pointer ${
+                      aiConvId === chat.id
+                        ? 'bg-indigo-50/50 border-indigo-100 hover:bg-indigo-50'
+                        : 'bg-white border-slate-100 hover:border-slate-200 hover:bg-slate-50/50'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        aiConvId === chat.id ? 'bg-indigo-100/50 text-indigo-600' : 'bg-slate-100 text-slate-500'
+                      }`}>
+                        <MessageSquare className="w-4 h-4" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className={`text-xs font-bold truncate ${
+                          aiConvId === chat.id ? 'text-indigo-900' : 'text-slate-700'
+                        }`}>
+                          {chat.title}
+                        </h4>
+                        <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">
+                          {new Date(chat.updatedAt).toLocaleString('vi-VN')}
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={(e) => deleteChatHistory(chat.id, e)}
+                      className="p-1.5 rounded-xl hover:bg-rose-50 text-slate-400 hover:text-rose-600 transition-colors border-0 bg-transparent ml-2 shrink-0 cursor-pointer"
+                      title="Xóa lịch sử"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

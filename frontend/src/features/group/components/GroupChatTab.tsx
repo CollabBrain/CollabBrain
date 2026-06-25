@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Send, Paperclip, Pin, CornerUpLeft, MoreVertical, X, RotateCcw, Trash2,
   ChevronDown, ChevronUp, FileText, Image as ImageIcon, File as FileIcon,
-  Loader2, MessageSquare, Download, Ban
+  Loader2, MessageSquare, Download, Ban, Sparkles
 } from 'lucide-react';
 import { useGroupChat } from '../../../hooks/useGroupChat';
 import type { GroupMessage, MentionedUser } from '../../../types/chat.types';
@@ -92,32 +92,58 @@ const ReplyBar = ({ message, onCancel }: { message: GroupMessage; onCancel: () =
 );
 
 /** Mention highlight trong nội dung tin nhắn */
-const renderContent = (content: string, mentions?: GroupMessage['mentions']) => {
+const renderContent = (content: string, mentions?: GroupMessage['mentions'], isMe?: boolean) => {
   if (!content) return '';
-  if (!mentions || mentions.length === 0) return content;
-  let result = content;
-  mentions.forEach(({ user }) => {
-    if (!user) return;
-    result = result.replace(
-      new RegExp(`@${user.name}`, 'g'),
-      `__MENTION__${user.name}__MENTION__`
-    );
-  });
-  const parts = result.split(/__MENTION__|__MENTION__/);
-  return (
-    <>
-      {parts.map((part, i) => {
-        const isMention = mentions.some(({ user }) => user.name === part);
-        return isMention ? (
-          <span key={i} className="text-indigo-600 font-semibold bg-indigo-50 px-0.5 rounded">
-            @{part}
-          </span>
-        ) : (
-          <span key={i}>{part}</span>
-        );
-      })}
-    </>
-  );
+
+  // Regex tìm các chuỗi bắt đầu bằng @ theo sau là chữ tiếng Việt/Anh, số, khoảng trắng (tối đa 3 từ)
+  const mentionRegex = /@([A-Za-z0-9_À-ỹ]+(?:\s+[A-Za-z0-9_À-ỹ]+){0,2})/g;
+
+  const parts: React.ReactNode[] = [];
+  let lastIndex = 0;
+  let match;
+
+  mentionRegex.lastIndex = 0;
+  let key = 0;
+
+  while ((match = mentionRegex.exec(content)) !== null) {
+    const matchIndex = match.index;
+    const matchText = match[0];
+    const name = match[1];
+
+    // Add text trước mention
+    if (matchIndex > lastIndex) {
+      parts.push(<span key={key++}>{content.substring(lastIndex, matchIndex)}</span>);
+    }
+
+    // Kiểm tra nếu là AI Assistant hoặc AI thì hiển thị dạng chữ thường bình thường, không bọc trong pill xanh nổi bật
+    const isAIBot = name.toLowerCase() === 'ai assistant' || name.toLowerCase() === 'ai';
+
+    if (isAIBot) {
+      parts.push(<span key={key++}>{matchText}</span>);
+    } else {
+      // Add mention khác (thành viên thường) được định dạng đậm màu xanh nước biển / trắng tùy người gửi
+      parts.push(
+        <span
+          key={key++}
+          className={`font-bold px-1 py-0.5 rounded-md ${
+            isMe 
+              ? 'text-white bg-white/20' 
+              : 'text-blue-600 bg-blue-50 border border-blue-100 font-bold'
+          }`}
+        >
+          {matchText}
+        </span>
+      );
+    }
+
+    lastIndex = mentionRegex.lastIndex;
+  }
+
+  if (lastIndex < content.length) {
+    parts.push(<span key={key++}>{content.substring(lastIndex)}</span>);
+  }
+
+  return parts.length > 0 ? <>{parts}</> : <>{content}</>;
 };
 
 /** Một bong bóng tin nhắn */
@@ -199,28 +225,43 @@ const MessageBubble = ({
           )}
 
           {/* Bubble body */}
-          <div className={`relative px-4 py-2.5 text-[15px] max-w-full min-w-0 ${isMe
-            ? 'bg-[#0084FF] text-white rounded-[22px] rounded-br-[4px]'
-            : 'bg-[#E4E6EB] text-black rounded-[22px] rounded-bl-[4px]'
-          } ${message.isRecalled ? 'opacity-60 italic' : ''}`}>
-            {message.isRecalled ? (
+          {message.isRecalled ? (
+            <div className={`relative px-4 py-2.5 text-[15px] max-w-full min-w-0 ${isMe
+              ? 'bg-[#0084FF] text-white rounded-[22px] rounded-br-[4px]'
+              : 'bg-[#E4E6EB] text-black rounded-[22px] rounded-bl-[4px]'
+            } opacity-60 italic`}>
               <span className="text-sm opacity-80 inline-flex items-center gap-1.5"><Ban className="w-4 h-4" /> Tin nhắn đã được thu hồi</span>
-            ) : isFile ? (
-              <FileCard url={message.content} content={message.content} />
-            ) : isImage ? (
-              <img src={message.content} alt="Ảnh" className="max-w-[200px] max-h-[200px] rounded-xl object-cover cursor-pointer" onClick={() => window.open(message.content, '_blank')} />
-            ) : (
-              <p className="leading-snug whitespace-pre-wrap break-words break-all">
-                {renderContent(message.content, message.mentions)}
+              <p className="text-[10px] mt-1 flex items-center justify-end gap-1 text-indigo-100">
+                {formatTime(message.createdAt)}
               </p>
-            )}
-
-            {/* Timestamp */}
-            <p className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${isMe ? 'text-indigo-100' : 'text-slate-400'}`}>
-              {formatTime(message.createdAt)}
-              {message.isPinned && <Pin className="w-3 h-3" />}
-            </p>
-          </div>
+            </div>
+          ) : isFile ? (
+            <div className={`max-w-full min-w-0 flex flex-col ${isMe ? 'items-end' : 'items-start'} select-none`}>
+              <FileCard url={message.content} content={message.content} />
+              <p className="text-[10px] mt-1 text-slate-400 flex items-center gap-1">
+                {formatTime(message.createdAt)}
+                {message.isPinned && <Pin className="w-3 h-3 text-slate-400" />}
+              </p>
+            </div>
+          ) : (
+            <div className={`relative px-4 py-2.5 text-[15px] max-w-full min-w-0 ${isMe
+              ? 'bg-[#0084FF] text-white rounded-[22px] rounded-br-[4px]'
+              : 'bg-[#E4E6EB] text-black rounded-[22px] rounded-bl-[4px]'
+            }`}>
+              {isImage ? (
+                <img src={message.content} alt="Ảnh" className="max-w-[200px] max-h-[200px] rounded-xl object-cover cursor-pointer" onClick={() => window.open(message.content, '_blank')} />
+              ) : (
+                <p className="leading-snug whitespace-pre-wrap break-words break-all">
+                  {renderContent(message.content, message.mentions, isMe)}
+                </p>
+              )}
+              {/* Timestamp */}
+              <p className={`text-[10px] mt-1 flex items-center justify-end gap-1 ${isMe ? 'text-indigo-100' : 'text-slate-400'}`}>
+                {formatTime(message.createdAt)}
+                {message.isPinned && <Pin className="w-3 h-3" />}
+              </p>
+            </div>
+          )}
 
           {/* Action menu button (hover, bên phải cho tin của mình) */}
           {isMe && !message.isRecalled && (
@@ -378,6 +419,8 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [attachedFile, setAttachedFile] = useState<File | null>(null);
+  const [isAiMode, setIsAiMode] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -410,6 +453,14 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
     const val = e.target.value;
     setInputValue(val);
 
+    // Tự động phát hiện nếu có tiền tố @AI Assistant hoặc @AI ở đầu ô nhập liệu để bật/tắt viền phát sáng AI Mode
+    const hasAIPrefix = /^\s*@AI Assistant/gi.test(val) || /^\s*@AI/gi.test(val);
+    if (hasAIPrefix && !isAiMode) {
+      setIsAiMode(true);
+    } else if (!hasAIPrefix && isAiMode) {
+      setIsAiMode(false);
+    }
+
     // Detect @mention
     const atIdx = val.lastIndexOf('@');
     if (atIdx >= 0) {
@@ -439,15 +490,61 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
   };
 
   // ——— Send ———
-  const handleSend = () => {
-    if (!inputValue.trim() || !canSend) return;
-    sendMessage(inputValue, {
-      replyToId: replyTo?.id,
-      mentionIds: mentionIds.length > 0 ? mentionIds : undefined
-    });
+  const handleSend = async () => {
+    if (!canSend) return;
+    const text = inputValue.trim();
+    if (!text && !attachedFile) return;
+
+    let uploadFailed = false;
+
+    // 1. Nếu có file đính kèm, thực hiện upload trước
+    if (attachedFile) {
+      setUploadingFile(true);
+      setUploadProgress(0);
+      try {
+        const result = await uploadFile(attachedFile, setUploadProgress);
+        if (!result) {
+          uploadFailed = true;
+        }
+      } catch (err) {
+        console.error("Lỗi upload file trong group chat:", err);
+        uploadFailed = true;
+      } finally {
+        setUploadingFile(false);
+        setUploadProgress(0);
+        setAttachedFile(null);
+        if (fileInputRef.current) {
+          fileInputRef.current.value = '';
+        }
+      }
+    }
+
+    if (uploadFailed) return;
+
+    // 2. Nếu có tin nhắn văn bản, gửi nó đi sau đó (ghi riêng ra)
+    if (text) {
+      const finalMentionIds = Array.from(new Set(
+        isAiMode 
+          ? [...mentionIds, 'ai-assistant-bot-uuid']
+          : mentionIds
+      ));
+
+      // Đảm bảo tin gửi đi có chứa prefix nếu đang ở chế độ AI
+      let finalText = text;
+      if (isAiMode && !text.toLowerCase().startsWith('@ai assistant') && !text.toLowerCase().startsWith('@ai')) {
+        finalText = `@AI Assistant ${text}`;
+      }
+
+      sendMessage(finalText, {
+        replyToId: replyTo?.id,
+        mentionIds: finalMentionIds.length > 0 ? finalMentionIds : undefined
+      });
+    }
+
     setInputValue('');
     setReplyTo(null);
     setMentionIds([]);
+    setIsAiMode(false);
     sendTyping(false);
     inputRef.current?.focus();
   };
@@ -460,25 +557,96 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
   };
 
   // ——— File upload ———
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     if (file.size > 30 * 1024 * 1024) {
       alert('File không được vượt quá 30MB');
       return;
     }
-    setUploadingFile(true);
-    setUploadProgress(0);
-    await uploadFile(file, setUploadProgress);
-    setUploadingFile(false);
-    setUploadProgress(0);
-    e.target.value = '';
+    setAttachedFile(file);
+  };
+
+  const renderAttachedFilePreview = () => {
+    if (!attachedFile) return null;
+    const name = attachedFile.name.toLowerCase();
+    const isDocx = name.endsWith('.docx') || name.endsWith('.doc');
+    const isXlsx = name.endsWith('.xlsx') || name.endsWith('.xls');
+    const isPptx = name.endsWith('.pptx') || name.endsWith('.ppt');
+    const isImage = attachedFile.type.startsWith('image/') || name.match(/\.(jpg|jpeg|png|gif|webp)$/i);
+
+    let iconBg = 'bg-rose-500'; // red for PDF
+    let typeLabel = 'PDF';
+    let IconComponent = FileText;
+
+    if (isDocx) {
+      iconBg = 'bg-blue-500'; // blue for Word
+      typeLabel = 'DOCX';
+      IconComponent = FileIcon;
+    } else if (isXlsx) {
+      iconBg = 'bg-emerald-500'; // green for Excel
+      typeLabel = 'XLSX';
+      IconComponent = FileIcon;
+    } else if (isPptx) {
+      iconBg = 'bg-orange-500'; // orange for PowerPoint
+      typeLabel = 'PPTX';
+      IconComponent = FileIcon;
+    } else if (isImage) {
+      iconBg = 'bg-purple-500'; // purple for Image
+      typeLabel = 'IMAGE';
+      IconComponent = ImageIcon;
+    }
+
+    return (
+      <div className="mb-3 p-3 bg-slate-50/70 border border-slate-200/60 rounded-2xl flex items-center justify-between select-none relative transition-all duration-200 max-w-sm w-full">
+        <div className="flex items-center gap-3 min-w-0 flex-1">
+          <div className={`${iconBg} w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm text-white`}>
+            {uploadingFile ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <IconComponent className="w-5 h-5" />
+            )}
+          </div>
+          <div className="flex-1 min-w-0">
+            <h4 className="text-xs font-bold text-slate-800 truncate leading-snug">{attachedFile.name}</h4>
+            <span className="text-[10px] text-slate-400 font-semibold block mt-0.5">{typeLabel}</span>
+          </div>
+        </div>
+
+        {!uploadingFile && (
+          <button
+            type="button"
+            onClick={() => {
+              setAttachedFile(null);
+              if (fileInputRef.current) fileInputRef.current.value = '';
+            }}
+            className="p-1 rounded-full hover:bg-slate-200 text-slate-400 hover:text-slate-600 transition-colors border-0 bg-transparent cursor-pointer outline-none flex items-center justify-center shrink-0 ml-2"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        )}
+      </div>
+    );
   };
 
   // ——— Mention dropdown members ———
+  const AI_BOT_MEMBER: MemberData = {
+    id: 'ai-assistant-bot-member-id',
+    userId: 'ai-assistant-bot-uuid',
+    role: 'MEMBER' as any,
+    joinedAt: new Date().toISOString(),
+    user: {
+      id: 'ai-assistant-bot-uuid',
+      name: 'AI Assistant',
+      email: 'ai.assistant@collabbrain.com',
+    }
+  };
+
   const filteredMembers = mentionQuery !== null
-    ? members
-        .filter(m => m.userId !== myUserId)
+    ? [
+        AI_BOT_MEMBER,
+        ...members.filter(m => m.userId !== myUserId)
+      ]
         .filter(m => (m.user?.name || '').toLowerCase().includes(mentionQuery.toLowerCase()))
         .slice(0, 6)
     : [];
@@ -585,6 +753,26 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
 
       {/* Input area */}
       <div className="px-3 pb-4 pt-2 bg-white">
+        {isAiMode && (
+          <div className="mb-2 p-2.5 bg-gradient-to-r from-violet-50 to-indigo-50 border border-indigo-100 rounded-xl flex items-center justify-between shadow-sm animate-fade-in">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
+              <Sparkles className="w-4 h-4 text-indigo-500 shrink-0 animate-pulse" />
+              <p className="text-xs font-semibold text-indigo-700 truncate">
+                Chế độ hỏi AI: Câu hỏi sẽ được gửi trực tiếp tới AI Assistant để phân tích tài liệu nhóm.
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setIsAiMode(false);
+                setInputValue(prev => prev.replace(/^@AI Assistant\s*/gi, '').replace(/^@AI\s*/gi, '').trim());
+              }}
+              className="p-1 rounded-full hover:bg-indigo-100/50 text-indigo-400 hover:text-indigo-600 transition-colors border-0 bg-transparent cursor-pointer outline-none flex items-center justify-center shrink-0 ml-2"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        )}
+        {renderAttachedFilePreview()}
         {canSend ? (
           <div className="flex items-end gap-2">
             {/* File attach button */}
@@ -604,16 +792,48 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
               onChange={handleFileChange}
             />
 
+            {/* AI Sparkle button */}
+            <button
+              onClick={() => {
+                if (!isAiMode) {
+                  // Bật AI Mode: đưa @AI Assistant vào input
+                  setInputValue(prev => {
+                    const clean = prev.replace(/^@AI Assistant\s*/gi, '').replace(/^@AI\s*/gi, '').trim();
+                    return `@AI Assistant ${clean}`.trim() + ' ';
+                  });
+                  setIsAiMode(true);
+                } else {
+                  // Tắt AI Mode: xóa @AI Assistant khỏi input
+                  setInputValue(prev => prev.replace(/^@AI Assistant\s*/gi, '').replace(/^@AI\s*/gi, '').trim());
+                  setIsAiMode(false);
+                }
+              }}
+              className={`p-2 mb-1 rounded-full border-0 bg-transparent cursor-pointer transition-all duration-200 shrink-0 ${
+                isAiMode 
+                  ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 shadow-[0_0_8px_rgba(99,102,241,0.2)] scale-110' 
+                  : 'text-slate-400 hover:text-indigo-500 hover:bg-slate-100'
+              }`}
+              title="Hỏi AI Assistant"
+            >
+              <Sparkles className="w-6 h-6" />
+            </button>
+
             {/* Text input */}
-            <div className="flex-1 relative bg-[#F0F2F5] rounded-[20px] flex items-end">
+            <div className={`flex-1 relative rounded-[20px] flex items-end border transition-all duration-300 ${
+              isAiMode 
+                ? 'bg-indigo-50/30 border-indigo-300 shadow-[0_0_8px_rgba(99,102,241,0.15)]' 
+                : 'bg-[#F0F2F5] border-transparent'
+            }`}>
               <textarea
                 ref={inputRef}
                 value={inputValue}
                 onChange={handleInputChange}
                 onKeyDown={handleKeyDown}
-                placeholder="Aa"
+                placeholder={isAiMode ? "Hỏi AI Assistant về tài liệu nhóm..." : "Aa"}
                 rows={1}
-                className="w-full px-4 py-3 text-[15px] bg-transparent border-0 focus:ring-0 outline-none transition-all resize-none block"
+                className={`w-full px-4 py-3 text-[15px] bg-transparent border-0 focus:ring-0 outline-none transition-all resize-none block ${
+                  isAiMode ? 'font-bold text-indigo-950 placeholder:text-indigo-400' : 'text-slate-800'
+                }`}
                 style={{ maxHeight: '120px', lineHeight: '1.4' }}
                 onInput={(e) => {
                   const t = e.target as HTMLTextAreaElement;
@@ -626,7 +846,7 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
             {/* Send button */}
             <button
               onClick={handleSend}
-              disabled={!inputValue.trim() || uploadingFile}
+              disabled={(!inputValue.trim() && !attachedFile) || uploadingFile}
               className="p-2 mb-1 text-[#0084FF] hover:bg-slate-100 rounded-full border-0 bg-transparent cursor-pointer transition-colors shrink-0 disabled:opacity-50"
             >
               <Send className="w-6 h-6" />

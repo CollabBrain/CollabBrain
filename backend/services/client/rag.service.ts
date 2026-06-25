@@ -1,6 +1,6 @@
 import prisma from "../../config/prisma"
 import { chunkText } from "../../helpers/rag/chunker"
-import { getEmbeding } from "../../helpers/rag/embeder"
+import { getEmbeding, getBatchEmbeddings, callReranker } from "../../helpers/rag/embeder"
 import { extractTextFromUrl } from "../../helpers/rag/extractors"
 import { callLLM } from "../../helpers/rag/llm"
 import { findDocumentById } from "../../repositories/client/document.repo"
@@ -35,30 +35,58 @@ export const ingestDocumentService = async (documentId: string) => {
   const chunksToEmbed = await prisma.documentChunk.findMany({
     where: { documentId: doc.id, isEmbedded: false }
   });
-  for (const chunk of chunksToEmbed) {
+
+  if (chunksToEmbed.length > 0) {
     try {
-      const vector = await getEmbeding(chunk.content, false);
-      await updateChunkEmbedding(chunk.id, vector);
+      const contents = chunksToEmbed.map(c => c.content);
+      const vectors = await getBatchEmbeddings(contents, false);
+      
+      await Promise.all(
+        chunksToEmbed.map((chunk, index) => 
+          updateChunkEmbedding(chunk.id, vectors[index])
+        )
+      );
     } catch (err: any) {
-      console.error(`[RAG Ingestion] Lỗi tạo nhúng cho chunk ID ${chunk.id}:`, err.message);
+      console.error(`[RAG Ingestion] Lỗi sinh vector hàng loạt cho tài liệu ${doc.name}:`, err.message);
+      throw err;
     }
   }
   console.log(`[RAG Ingestion] Hoàn thành phân tích và tạo chỉ mục RAG cho file ${doc.name} thành công.`);
 }
-export const queryRAGService = async (userId: string, question: string, options: { groupId?: string }) => {
+export const queryRAGService = async (userId: string, question: string, options: { groupId?: string, conversationId?: string }) => {
   const queryVector = await getEmbeding(question, true)
   const matchChunks = await searchSimilarChunks(queryVector, {
-    limit: 5,
+    limit: 5, // Giảm xuống 5 để tối ưu hóa hiệu năng CPU chạy Reranker cục bộ
     userId,
-    groupId: options.groupId
+    groupId: options.groupId,
+    conversationId: options.conversationId,
+    textQuery: question
   })
+  
   if (matchChunks.length === 0) {
     return {
       answer: "Không tìm thấy nội dung liên quan trong cơ sở dữ liệu tài liệu mà bạn có quyền truy cập.",
       sources: [],
     };
   }
-  const context = matchChunks.map((c, i) => `[Tài liệu ${i + 1}: ${c.documentName}\nNội dung:\n${c.content}]`)
+
+  // 2. Chạy Reranker để xếp hạng lại
+  let finalChunks = matchChunks;
+  try {
+    const scores = await callReranker(question, matchChunks.map(c => c.content));
+    const chunksWithScores = matchChunks.map((chunk, index) => ({
+      ...chunk,
+      rerankScore: scores[index] ?? -99
+    }));
+    // Sắp xếp theo điểm rerank giảm dần và lấy 5 đoạn tốt nhất
+    chunksWithScores.sort((a, b) => b.rerankScore - a.rerankScore);
+    finalChunks = chunksWithScores.slice(0, 5);
+  } catch (err) {
+    console.error("Lỗi Reranker, tự động fallback lấy 5 kết quả đầu của Hybrid Search:", err);
+    finalChunks = matchChunks.slice(0, 5);
+  }
+
+  const context = finalChunks.map((c, i) => `[Tài liệu ${i + 1}: ${c.documentName}\nNội dung:\n${c.content}]`)
     .join("\n\n---\n\n")
   const prompt = `
     Dưới đây là một số thông tin tham khảo cho câu hỏi. Bạn tham sử dụng chúng để trả lời câu hỏi
@@ -67,7 +95,7 @@ export const queryRAGService = async (userId: string, question: string, options:
     Trả lời: 
   `
   const answer = await callLLM(prompt)
-  const sources = matchChunks.map((c) => ({
+  const sources = finalChunks.map((c) => ({
     documentName: c.documentName,
     documentUrl: c.documentUrl,
     chunkIndex: c.chunkIndex,

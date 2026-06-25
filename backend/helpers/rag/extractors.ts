@@ -6,6 +6,7 @@ import { supabase } from "../../config/supabase";
 const { PDFParse } = require("pdf-parse");
 const mammoth = require("mammoth");
 const XLSX = require("xlsx");
+const officeparser = require("officeparser");
 
 export const cleanText = (text: string): string => {
   return text
@@ -54,6 +55,8 @@ export const extractTextFromUrl = async (url: string, filename: string): Promise
   } else if (ext === ".docx") {
     const result = await mammoth.extractRawText({ buffer });
     text = result.value;
+  } else if (ext === ".pptx") {
+    text = await officeparser.parseOfficeAsync(buffer);
   } else if (ext === ".xlsx" || ext === ".xls") {
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
     const parts: string[] = [];

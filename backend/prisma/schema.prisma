@@ -91,6 +91,7 @@ model Document {
   isDeleted  Boolean         @default(false) @map("is_deleted")
   createdAt  DateTime        @default(now()) @map("created_at")
   groupId    String?         @map("group_id")
+  conversationId String?         @map("conversation_id")
   uploadedBy String          @map("uploaded_by")
   mimeType   String?         @map("mime_type")
   updatedAt  DateTime        @updatedAt @map("updated_at")
@@ -100,6 +101,7 @@ model Document {
 
   @@index([groupId, createdAt])
   @@index([uploadedBy, createdAt])
+  @@index([conversationId, createdAt])
   @@map("documents")
 }
 
