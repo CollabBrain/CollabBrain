@@ -93,6 +93,9 @@ model User {
   messageMentions     MessageMention[]
   reportsSent         Report[]          @relation("Reporter")
   reportsReceived     Report[]          @relation("ReportedUser")
+  decks               Deck[]
+  deckShares          DeckShare[]
+  reviews             Review[]
   @@map("users")
 }
 
@@ -112,6 +115,7 @@ model Group {
   invitations GroupInvitation[]
   messages    Message[]
   reports     Report[]
+  decks       Deck[]
   @@map("groups")
 }
 
@@ -247,6 +251,94 @@ model MessageMention {
 enum ReportStatus {
   PENDING
   RESOLVED
+}
+
+// ============================================================
+// ——— FLASHCARD MODELS ———
+// ============================================================
+
+enum CardDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Deck {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  color       String      @default("#3B82F6")
+  icon        String?     // SVG icon name or emoji
+  isPublic    Boolean     @default(false) @map("is_public")
+  isDeleted   Boolean     @default(false) @map("is_deleted")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  createdBy   String      @map("created_by")
+  creator     User        @relation(fields: [createdBy], references: [id])
+
+  // Deck có thể thuộc về một nhóm (tùy chọn)
+  groupId     String?     @map("group_id")
+  group       Group?      @relation(fields: [groupId], references: [id])
+
+  cards       Flashcard[]
+  shares      DeckShare[]
+
+  @@map("decks")
+}
+
+model DeckShare {
+  id        String   @id @default(uuid())
+  deckId    String   @map("deck_id")
+  userId    String   @map("user_id")
+  canEdit   Boolean  @default(false) @map("can_edit")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  deck  Deck  @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, userId])
+  @@map("deck_shares")
+}
+
+model Flashcard {
+  id          String        @id @default(uuid())
+  deckId      String        @map("deck_id")
+  front       String        // Mặt trước (câu hỏi)
+  back        String        // Mặt sau (đáp án)
+  hint        String?       // Gợi ý
+  imageUrl    String?       @map("image_url")
+  tags        String[]      // Tag phân loại
+  difficulty  CardDifficulty @default(MEDIUM)
+  isDeleted   Boolean       @default(false) @map("is_deleted")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  updatedAt   DateTime      @updatedAt @map("updated_at")
+
+  deck    Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  reviews Review[]
+
+  // Spaced Repetition fields
+  nextReviewAt DateTime?    @map("next_review_at")
+  intervalDays Int          @default(1) @map("interval_days")
+  easeFactor   Float        @default(2.5) @map("ease_factor")
+  repetitions  Int          @default(0) // Số lần đã review
+
+  @@map("flashcards")
+}
+
+model Review {
+  id         String   @id @default(uuid())
+  cardId     String   @map("card_id")
+  userId     String   @map("user_id")
+  quality    Int      // 0-5: 0=quên hoàn toàn, 5=nhớ ngay
+  timeSpent  Int?     @map("time_spent") // Thời gian suy nghĩ (ms)
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  card  Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, userId, createdAt])
+  @@map("reviews")
 }
 
 model Report {

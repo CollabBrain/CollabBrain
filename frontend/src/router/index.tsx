@@ -27,6 +27,10 @@ const SuggestionsPage = lazy(() => import('../pages/SuggestionsPage').then(modul
 const BlockedListPage = lazy(() => import('../pages/BlockedListPage').then(module => ({ default: module.BlockedListPage })));
 const UserProfilePage = lazy(() => import('../pages/UserProfilePage').then(module => ({ default: module.UserProfilePage })));
 
+// Lazy load flashcard pages
+const DecksPage = lazy(() => import('../features/flashcard/pages/DecksPage').then(module => ({ default: module.DecksPage })));
+const DeckDetailPage = lazy(() => import('../features/flashcard/pages/DeckDetailPage').then(module => ({ default: module.DeckDetailPage })));
+
 // Lazy load admin pages
 const AdminLoginPage = lazy(() => import('../pages/admin/AdminLoginPage'));
 const AdminStatsPage = lazy(() => import('../pages/admin/AdminStatsPage'));
@@ -123,6 +127,10 @@ export const AppRouter = () => {
           <Route path="/friends/suggestions" element={<SuggestionsPage />} />
           <Route path="/friends/blocked" element={<BlockedListPage />} />
           <Route path="/users/:id" element={<UserProfilePage />} />
+
+          {/* ——— Flashcard routes */}
+          <Route path="/flashcard" element={<DecksPage />} />
+          <Route path="/flashcard/decks/:deckId" element={<DeckDetailPage />} />
         </Route>
 
         {/* ——— Admin Guest routes */}

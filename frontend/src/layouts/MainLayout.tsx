@@ -1,6 +1,6 @@
 import { useState, memo } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X } from 'lucide-react';
+import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, Layers } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import { ROUTES } from '../constants';
@@ -10,6 +10,7 @@ import { cn } from '../lib/utils';
 const NAV_ITEMS = [
   { to: ROUTES.CHAT, label: 'Chat', icon: MessageSquare },
   { to: ROUTES.DOCUMENTS, label: 'My Documents', icon: FileText },
+  { to: '/flashcard', label: 'Flashcard', icon: Layers },
   { to: '/friends', label: 'Friends', icon: User },
   { to: '/groups', label: 'Groups', icon: Users },
   { to: ROUTES.PROFILE, label: 'Profile', icon: UserCircle },
@@ -209,6 +210,11 @@ const MainLayout = () => {
           </div>
         ) : pathname.match(/^\/groups\/.+/) ? (
           // GroupWorkspacePage: full width, tự cuộn, không giới hạn max-width
+          <div className="flex-1 overflow-y-auto">
+            <Outlet />
+          </div>
+        ) : pathname.startsWith('/flashcard') ? (
+          // Flashcard pages: full width
           <div className="flex-1 overflow-y-auto">
             <Outlet />
           </div>

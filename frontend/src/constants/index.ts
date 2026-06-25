@@ -20,4 +20,6 @@ export const ROUTES = {
   CHAT: '/chat',
   DOCUMENTS: '/documents',
   GROUPS: '/groups',
+  FRIENDS: '/friends',
+  FLASHCARD: '/flashcard',
 } as const;

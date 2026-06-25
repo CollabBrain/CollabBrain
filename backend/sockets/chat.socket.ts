@@ -1,5 +1,5 @@
 import { Server, Socket } from "socket.io"
-import { createMessage, createGroupMessage, findGroupMessageById, recallGroupMessage } from "../repositories/client/chat.repo"
+import { createMessage, findMessageById } from "../repositories/client/chat.repo"
 import prisma from "../config/prisma"
 
 export const chatSocket = (io: Server) => {
@@ -11,7 +11,6 @@ export const chatSocket = (io: Server) => {
     socket.join(user.id)
     onlineUsers.set(user.id, socket.id)
 
-    // ——— Tự động join tất cả group rooms của user ———
     try {
       const memberships = await prisma.groupMember.findMany({
         where: { userId: user.id },
@@ -24,17 +23,13 @@ export const chatSocket = (io: Server) => {
       console.error("[Socket] Lỗi join group rooms:", e)
     }
 
-    // Thông báo user online cho tất cả
     socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: true })
 
-    // ================================================================
     // ——— CHAT 1-1 ———
-    // ================================================================
-
     socket.on("chat:send_message", async (data) => {
       try {
-        const { conversationId, content, type = "text", replyToId } = data
-        const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any, replyToId)
+        const { conversationId, content, type = "text" } = data
+        const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any)
 
         const formattedMessage = {
           ...savedMessage,
@@ -57,17 +52,12 @@ export const chatSocket = (io: Server) => {
       })
     })
 
-    // ================================================================
-    // ——— GROUP CHAT ———
-    // ================================================================
-
-    // --- group:send_message ---
+    // ——— GROUP CHAT (basic) ———
     socket.on("group:send_message", async (data) => {
       try {
-        const { groupId, content, type = "text", replyToId, mentionIds } = data
+        const { groupId, content, type = "text" } = data
         if (!groupId || !content) return
 
-        // Kiểm tra quyền thành viên
         const member = await prisma.groupMember.findUnique({
           where: { groupId_userId: { groupId, userId: user.id } }
         })
@@ -80,25 +70,18 @@ export const chatSocket = (io: Server) => {
           return
         }
 
-        // Kiểm tra replyToId hợp lệ (nếu có)
-        if (replyToId) {
-          const replyMsg = await prisma.message.findFirst({ where: { id: replyToId, groupId } })
-          if (!replyMsg) {
-            socket.emit("group:error", { message: "Tin nhắn reply không tồn tại" })
-            return
+        const savedMessage = await prisma.message.create({
+          data: {
+            senderId: user.id,
+            groupId,
+            content,
+            type: type.toUpperCase() as any
+          },
+          include: {
+            sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
           }
-        }
+        })
 
-        const savedMessage = await createGroupMessage(
-          user.id,
-          groupId,
-          content,
-          type.toUpperCase() as any,
-          replyToId,
-          mentionIds
-        )
-
-        // Broadcast cho tất cả member trong group room (kể cả sender)
         io.to(`group:${groupId}`).emit("group:new_message", {
           groupId,
           message: savedMessage
@@ -109,9 +92,7 @@ export const chatSocket = (io: Server) => {
       }
     })
 
-    // --- group:typing ---
     socket.on("group:typing", ({ groupId, isTyping }: { groupId: string; isTyping: boolean }) => {
-      // Broadcast tới các thành viên khác trong room (không gửi lại cho chính sender)
       socket.to(`group:${groupId}`).emit("group:typing", {
         groupId,
         userId: user.id,
@@ -120,10 +101,9 @@ export const chatSocket = (io: Server) => {
       })
     })
 
-    // --- group:recall_message ---
     socket.on("group:recall_message", async ({ groupId, messageId }: { groupId: string; messageId: string }) => {
       try {
-        const msg = await findGroupMessageById(messageId)
+        const msg = await findMessageById(messageId)
         if (!msg) {
           socket.emit("group:error", { message: "Không tìm thấy tin nhắn" })
           return
@@ -136,12 +116,17 @@ export const chatSocket = (io: Server) => {
           socket.emit("group:error", { message: "Bạn không có quyền thu hồi tin nhắn này" })
           return
         }
-        if (msg.isRecalled) {
-          socket.emit("group:error", { message: "Tin nhắn đã được thu hồi trước đó" })
-          return
-        }
 
-        const recalled = await recallGroupMessage(messageId)
+        const recalled = await prisma.message.update({
+          where: { id: messageId },
+          data: {
+            content: "🚫 Tin nhắn đã được thu hồi",
+            type: "TEXT"
+          },
+          include: {
+            sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
+          }
+        })
         io.to(`group:${groupId}`).emit("group:message_recalled", {
           groupId,
           messageId,
@@ -153,9 +138,7 @@ export const chatSocket = (io: Server) => {
       }
     })
 
-    // ================================================================
     // ——— Ngắt kết nối ———
-    // ================================================================
     socket.on("disconnect", () => {
       onlineUsers.delete(user.id)
       socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: false })
