@@ -8,36 +8,40 @@ import { searchSimilarChunks, updateChunkEmbedding, savedChunks } from "../../re
 import * as crypto from "crypto"
 
 export const ingestDocumentService = async (documentId: string) => {
-  const doc = await findDocumentById(documentId);
-  if (!doc) {
-    throw new Error("Không tìm thấy tài liệu")
-  }
-  const text = await extractTextFromUrl(doc.url, doc.name);
-  if (!text) {
-    console.log(`[RAG Ingestion] Cảnh báo: Tài liệu rỗng hoặc không có text để đọc: ${doc.id}`);
-    return
-  }
-  const rawChunks = chunkText(text);
-  const chunkData = rawChunks.map((chunk) => {
-    const hash = crypto
-      .createHash("sha256")
-      .update(`${doc.id}_${chunk.chunkIndex}_${chunk.content}`)
-      .digest("hex");
-    return {
-      documentId: doc.id,
-      chunkIndex: chunk.chunkIndex,
-      content: chunk.content,
-      contentHash: hash
-    };
-  });
-  await savedChunks(doc.id, chunkData);
-  
-  const chunksToEmbed = await prisma.documentChunk.findMany({
-    where: { documentId: doc.id, isEmbedded: false }
-  });
+  try {
+    const doc = await findDocumentById(documentId);
+    if (!doc) {
+      throw new Error("Không tìm thấy tài liệu")
+    }
+    const text = await extractTextFromUrl(doc.url, doc.name);
+    if (!text) {
+      console.log(`[RAG Ingestion] Cảnh báo: Tài liệu rỗng hoặc không có text để đọc: ${doc.id}`);
+      await prisma.document.update({
+        where: { id: doc.id },
+        data: { isEmbedded: true }
+      });
+      return
+    }
+    const rawChunks = chunkText(text);
+    const chunkData = rawChunks.map((chunk) => {
+      const hash = crypto
+        .createHash("sha256")
+        .update(`${doc.id}_${chunk.chunkIndex}_${chunk.content}`)
+        .digest("hex");
+      return {
+        documentId: doc.id,
+        chunkIndex: chunk.chunkIndex,
+        content: chunk.content,
+        contentHash: hash
+      };
+    });
+    await savedChunks(doc.id, chunkData);
+    
+    const chunksToEmbed = await prisma.documentChunk.findMany({
+      where: { documentId: doc.id, isEmbedded: false }
+    });
 
-  if (chunksToEmbed.length > 0) {
-    try {
+    if (chunksToEmbed.length > 0) {
       const contents = chunksToEmbed.map(c => c.content);
       const vectors = await getBatchEmbeddings(contents, false);
       
@@ -46,12 +50,25 @@ export const ingestDocumentService = async (documentId: string) => {
           updateChunkEmbedding(chunk.id, vectors[index])
         )
       );
-    } catch (err: any) {
-      console.error(`[RAG Ingestion] Lỗi sinh vector hàng loạt cho tài liệu ${doc.name}:`, err.message);
-      throw err;
     }
+
+    await prisma.document.update({
+      where: { id: doc.id },
+      data: { isEmbedded: true }
+    });
+    console.log(`[RAG Ingestion] Hoàn thành phân tích và tạo chỉ mục RAG cho file ${doc.name} thành công.`);
+  } catch (err: any) {
+    console.error(`[RAG Ingestion] Lỗi xử lý tài liệu ${documentId}:`, err.message);
+    try {
+      await prisma.document.update({
+        where: { id: documentId },
+        data: { isEmbedded: true }
+      });
+    } catch (dbErr) {
+      console.error(`[RAG Ingestion] Không thể cập nhật trạng thái lỗi cho tài liệu ${documentId}:`, dbErr);
+    }
+    throw err;
   }
-  console.log(`[RAG Ingestion] Hoàn thành phân tích và tạo chỉ mục RAG cho file ${doc.name} thành công.`);
 }
 export const queryRAGService = async (userId: string, question: string, options: { groupId?: string, conversationId?: string }) => {
   const queryVector = await getEmbeding(question, true)

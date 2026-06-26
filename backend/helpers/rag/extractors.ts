@@ -56,7 +56,8 @@ export const extractTextFromUrl = async (url: string, filename: string): Promise
     const result = await mammoth.extractRawText({ buffer });
     text = result.value;
   } else if (ext === ".pptx") {
-    text = await officeparser.parseOfficeAsync(buffer);
+    const ast = await officeparser.parseOffice(buffer);
+    text = ast.toText();
   } else if (ext === ".xlsx" || ext === ".xls") {
     const workbook = XLSX.read(buffer, { type: "buffer", cellDates: true });
     const parts: string[] = [];

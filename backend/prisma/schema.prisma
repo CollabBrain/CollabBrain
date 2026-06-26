@@ -40,7 +40,6 @@ model User {
   sentFriendships     Friendship[]      @relation("SentFriendships")
   sentInvitations     GroupInvitation[] @relation("InvitationSender")
   groupInvitations    GroupInvitation[] @relation("InvitationUser")
-  groups              GroupMember[]
   messageMentions     MessageMention[]
   pinnedMessages      Message[]         @relation("PinnedMessages")
   receivedMessages    Message[]         @relation("ReceivedMessages")
