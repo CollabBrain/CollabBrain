@@ -89,3 +89,10 @@ export const uploadFileApi = (file: File) => {
     }
   );
 };
+
+/** Gọi RAG Q&A trên tài liệu */
+export const queryRagApi = (question: string, groupId?: string, conversationId?: string) =>
+  axiosInstance.post<ApiResponse<{ answer: string; sources: Array<{ documentName: string; documentUrl: string; chunkIndex: number }> }>>(
+    '/rag/query',
+    { question, groupId, conversationId }
+  );

@@ -1,9 +1,32 @@
 import { Server, Socket } from "socket.io"
 import { createMessage, createGroupMessage, findGroupMessageById, recallGroupMessage } from "../repositories/client/chat.repo"
 import prisma from "../config/prisma"
+import { queryRAGService } from "../services/client/rag.service"
+
+const ensureAIBotUser = async () => {
+  try {
+    await prisma.user.upsert({
+      where: { id: "ai-assistant-bot-uuid" },
+      update: {},
+      create: {
+        id: "ai-assistant-bot-uuid",
+        name: "AI Assistant",
+        email: "ai.assistant@collabbrain.com",
+        passwordHash: "$2b$10$abcdefghijklmnopqrstuvwxyz0123456789", // dummy hash
+        avatarUrl: null,
+        isActive: true,
+      }
+    });
+  } catch (error) {
+    console.error("[Socket] Lỗi khởi tạo AI Bot User:", error);
+  }
+};
 
 export const chatSocket = (io: Server) => {
   const onlineUsers = new Map<string, string>()
+
+  // Đảm bảo AI Bot user tồn tại trong DB
+  ensureAIBotUser();
 
   io.on("connection", async (socket: Socket) => {
     const user = socket.data.user
@@ -251,13 +274,18 @@ export const chatSocket = (io: Server) => {
           }
         }
 
+        // Loại bỏ ID trùng lặp trong mentionIds nhằm tránh lỗi Unique Constraint của cơ sở dữ liệu
+        const uniqueMentionIds = mentionIds && mentionIds.length > 0
+          ? Array.from(new Set(mentionIds)) as string[]
+          : undefined;
+
         const savedMessage = await createGroupMessage(
           user.id,
           groupId,
           content,
           type.toUpperCase() as any,
           replyToId,
-          mentionIds
+          uniqueMentionIds
         )
 
         // Broadcast cho tất cả member trong group room (kể cả sender)
@@ -265,6 +293,89 @@ export const chatSocket = (io: Server) => {
           groupId,
           message: savedMessage
         })
+
+        // --- Xử lý câu trả lời từ AI Assistant (nếu được mention) ---
+        const AI_BOT_ID = "ai-assistant-bot-uuid";
+        const hasBotMention = (mentionIds && mentionIds.includes(AI_BOT_ID)) ||
+          (content && (content.includes("@AI Assistant") || content.includes("@AI")));
+
+        if (hasBotMention) {
+          // Gửi typing indicator của Bot ngay lập tức
+          io.to(`group:${groupId}`).emit("group:typing", {
+            groupId,
+            userId: AI_BOT_ID,
+            userName: "AI Assistant",
+            isTyping: true
+          });
+
+          // Chạy RAG truy vấn tài liệu bất đồng bộ
+          (async () => {
+            try {
+              // Đảm bảo AI Bot User tồn tại trong DB
+              await ensureAIBotUser();
+
+              // Làm sạch câu hỏi (loại bỏ phần mention)
+              let question = content.replace(/@AI Assistant/g, "").replace(/@AI/g, "").trim();
+              if (!question) {
+                question = "Xin chào! Bạn cần tôi giúp gì về tài liệu của nhóm?";
+              }
+
+              // Gọi RAG Service truy vấn tài liệu thuộc nhóm
+              const result = await queryRAGService(user.id, question, { groupId });
+
+              // Định dạng nội dung tin nhắn bot trả về
+              let botResponseContent = result.answer;
+              if (result.sources && result.sources.length > 0) {
+                const uniqueSources = Array.from(new Set(result.sources.map(s => s.documentName)));
+                botResponseContent += "\n\n📎 Nguồn tài liệu tham khảo:\n" + uniqueSources.map(name => `- ${name}`).join("\n");
+              }
+
+              // Lưu tin nhắn của Bot vào database
+              const botMessage = await createGroupMessage(
+                AI_BOT_ID,
+                groupId,
+                botResponseContent,
+                "TEXT"
+              );
+
+              // Tắt typing indicator của Bot
+              io.to(`group:${groupId}`).emit("group:typing", {
+                groupId,
+                userId: AI_BOT_ID,
+                userName: "AI Assistant",
+                isTyping: false
+              });
+
+              // Broadcast tin nhắn trả lời của Bot
+              io.to(`group:${groupId}`).emit("group:new_message", {
+                groupId,
+                message: botMessage
+              });
+
+            } catch (err: any) {
+              console.error("[Socket RAG Bot Error]", err);
+              // Tắt typing indicator
+              io.to(`group:${groupId}`).emit("group:typing", {
+                groupId,
+                userId: AI_BOT_ID,
+                userName: "AI Assistant",
+                isTyping: false
+              });
+
+              // Gửi tin nhắn báo lỗi từ Bot
+              const botErrorMessage = await createGroupMessage(
+                AI_BOT_ID,
+                groupId,
+                "Xin lỗi, đã xảy ra lỗi trong quá trình xử lý câu hỏi của bạn. Vui lòng thử lại sau.",
+                "TEXT"
+              );
+              io.to(`group:${groupId}`).emit("group:new_message", {
+                groupId,
+                message: botErrorMessage
+              });
+            }
+          })();
+        }
       } catch (error: any) {
         console.error("[Socket group:send_message]", error.message)
         socket.emit("group:error", { message: error.message })

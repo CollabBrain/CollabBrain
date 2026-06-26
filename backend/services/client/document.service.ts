@@ -10,6 +10,7 @@ import {
 } from "../../repositories/client/document.repo";
 import { findGroupById, findGroupMember } from "../../repositories/client/group.repo";
 import { uploadToSupabase } from "../../helpers/upload";
+import { ingestDocumentService } from "./rag.service";
 
 // ============================================================
 // Helpers
@@ -45,7 +46,8 @@ const getDocumentTypeFromMime = (mimeType: string): DocumentType => {
  */
 export const uploadPersonalDocumentService = async (
   file: Express.Multer.File,
-  userId: string
+  userId: string,
+  conversationId?: string
 ) => {
   if (!file) throw new Error("Không tìm thấy file để upload");
 
@@ -62,8 +64,14 @@ export const uploadPersonalDocumentService = async (
     size: file.size,
     mimeType: file.mimetype,
     groupId: undefined, // tài liệu cá nhân
+    conversationId,
     uploadedBy: userId,
   });
+
+  // Tự động kích hoạt phân tích RAG bất đồng bộ (fire-and-forget)
+  ingestDocumentService(document.id).catch((err) =>
+    console.error(`Tự động phân tích RAG thất bại cho tài liệu cá nhân ${document.id}:`, err)
+  );
 
   return {
     data: document,
@@ -109,6 +117,11 @@ export const uploadGroupDocumentService = async (
     groupId,
     uploadedBy: userId,
   });
+
+  // Tự động kích hoạt phân tích RAG bất đồng bộ (fire-and-forget)
+  ingestDocumentService(document.id).catch((err) =>
+    console.error(`Tự động phân tích RAG thất bại cho tài liệu nhóm ${document.id}:`, err)
+  );
 
   return {
     data: document,

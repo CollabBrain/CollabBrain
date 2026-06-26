@@ -6,6 +6,7 @@ import { groupRoutes } from "./group.routes";
 import { uploadRoutes } from "./upload.route";
 import { reportRoutes } from "./report.route";
 import { documentRoutes } from "./document.route";
+import { ragRoutes } from "./rag.route";
 import { settingRoutes } from "./setting.route";
 import { todoRoutes } from "./todo.route";
 
@@ -24,6 +25,8 @@ app.use("/reports", reportRoutes)
 app.use("/user/reports", reportRoutes)
 app.use("/documents", documentRoutes)
 app.use("/user/documents", documentRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
+app.use("/rag", ragRoutes)
+app.use("/user/rag", ragRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
 app.use("/settings", settingRoutes)
 app.use("/user/settings", settingRoutes)
 app.use("/todos", todoRoutes)
