@@ -9,6 +9,8 @@ export const getListFriend = async (id: string) => {
       u.email,
       u.avatar_url AS "avatarUrl",
       u.bio,
+      u.status,
+      u.status_expires_at AS "statusExpiresAt",
       u.created_at AS "createdAt"
     FROM friendships f
     JOIN users u 
@@ -131,17 +133,17 @@ export const getSuggestFriend = async (myId: string, limit:number) => {
 
 export const getSearchSuggestions = async (myId: string, keyword: string)=>{
   if(!keyword.trim()) return []
-  const words = keyword.trim().split(/\s+/)
+  const cleanKeyword = keyword.trim()
 
-  const searchPattern = words.map((word,index)=> index ===  words.length -1 ?`${word}:*` : word).join(" & ")
   const users = await prisma.user.findMany({
     where:{
       id: { not: myId },
       isDeleted: false,
       isActive: true,
-      name:{ 
-        search: searchPattern
-      },
+      OR: [
+        { name: { contains: cleanKeyword, mode: 'insensitive' } },
+        { email: { contains: cleanKeyword, mode: 'insensitive' } }
+      ],
       NOT: {
         OR: [
           {
@@ -172,7 +174,7 @@ export const getSearchSuggestions = async (myId: string, keyword: string)=>{
         select: { status: true, senderId: true, receiverId: true }
       }
     },
-    take: 5
+    take: 20
   })
 
   return users.map(u => {
@@ -186,7 +188,6 @@ export const getSearchSuggestions = async (myId: string, keyword: string)=>{
       friendship: friendship ? {
         status: friendship.status,
         senderId: friendship.senderId,
-        
         receiverId: friendship.receiverId
       } : null
     }

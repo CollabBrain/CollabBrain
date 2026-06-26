@@ -7,6 +7,8 @@ export interface ChatUser {
   avatarUrl: string | null;
   isOnline?: boolean;
   lastSeen?: string | null;
+  status?: string | null;
+  statusExpiresAt?: string | null;
 }
 
 export interface Message {

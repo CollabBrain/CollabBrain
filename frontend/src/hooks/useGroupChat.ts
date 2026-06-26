@@ -284,7 +284,7 @@ export const useGroupChat = ({
       if (socket) {
         socket.emit('group:send_message', {
           groupId,
-          content: result.url,
+          content: `${result.url}?filename=${encodeURIComponent(result.fileName)}`,
           type: 'file',
         });
       }

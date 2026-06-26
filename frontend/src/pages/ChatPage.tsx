@@ -7,6 +7,7 @@ import { initSocket } from '../socket/socket';
 import { ErrorBoundary } from '../components/ErrorBoundary';
 import { uploadPersonalDocumentApi } from '../features/group/services/document.service';
 import { queryRagApi } from '../features/chat/services/chat.service';
+import { useSettings } from '../hooks/useSettings';
 
 // Lazy imports to isolate crashes
 import ChatSidebar from '../features/chat/components/ChatSidebar';
@@ -14,6 +15,7 @@ import ChatWindow from '../features/chat/components/ChatWindow';
 
 import { getConversationsApi } from '../features/chat/services/chat.service';
 import { getSocket } from '../socket/socket';
+import { useChatSocket } from '../features/chat/hooks/useChat';
 import type { Conversation, SocketNewMessage, SocketTypingEvent, SocketOnlineStatus } from '../types/chat.types';
 
 /**
@@ -90,52 +92,8 @@ const ChatPage = () => {
     })();
   }, [accessToken]);
 
-  // Register socket events (once)
-  const socketRegisteredRef = useRef(false);
-  useEffect(() => {
-    if (!accessToken || socketRegisteredRef.current) return;
-    const socket = getSocket();
-    if (!socket) return;
-    socketRegisteredRef.current = true;
-
-    const handleNewMessage = ({ message }: SocketNewMessage) => {
-      useChatStore.getState().addMessage(message);
-      const convs = useChatStore.getState().conversations;
-      const conv = convs.find((c) => c.id === message.conversationId);
-      if (conv) {
-        let myId = '';
-        try {
-          const payload = JSON.parse(atob(accessToken.split('.')[1]));
-          myId = payload.id ?? payload.sub ?? payload.userId ?? '';
-        } catch {}
-
-        const isFromMe = message.senderId === myId;
-        useChatStore.getState().addOrUpdateConversation({
-          ...conv,
-          lastMessage: message,
-          updatedAt: message.createdAt,
-          unreadCount: isFromMe ? conv.unreadCount : conv.unreadCount + 1,
-        });
-      }
-    };
-    const handleTyping = ({ conversationId, userId, isTyping }: SocketTypingEvent) => {
-      useChatStore.getState().setTyping(conversationId, userId, isTyping);
-    };
-    const handleOnlineStatus = ({ userId, isOnline }: SocketOnlineStatus) => {
-      useChatStore.getState().setOnlineStatus(userId, isOnline);
-    };
-
-    socket.on('chat:new_message', handleNewMessage);
-    socket.on('chat:typing', handleTyping);
-    socket.on('user:online_status', handleOnlineStatus);
-
-    return () => {
-      socket.off('chat:new_message', handleNewMessage);
-      socket.off('chat:typing', handleTyping);
-      socket.off('user:online_status', handleOnlineStatus);
-      socketRegisteredRef.current = false;
-    };
-  }, [accessToken]);
+  // Register all chat socket events (handles initial_online, typing, new_message, recall, pin, etc.)
+  useChatSocket();
 
   // Switch mobile view when conversation is selected
   useEffect(() => {
@@ -198,6 +156,8 @@ const ChatPage = () => {
  */
 const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: string; onBackMobile: () => void }) => {
   const { data: profile } = useProfile();
+  const { data: settings } = useSettings();
+  const webName = settings?.web_name || 'Studifier';
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
@@ -549,6 +509,18 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
       if (answerData.sources && answerData.sources.length > 0) {
         const uniqueDocs = Array.from(new Set(answerData.sources.map(s => s.documentName)));
         responseText += `\n\n**Nguồn tham khảo:**\n` + uniqueDocs.map(doc => `* 📎 ${doc}`).join('\n');
+      const lower = text.toLowerCase();
+      if (lower.includes('hello') || lower.includes('hi') || lower.includes('xin chào')) {
+        reply = `Xin chào ${profile?.name || 'bạn'}! Tôi là Trợ lý học tập AI của ${webName}. Hôm nay tôi có thể hỗ trợ gì cho bạn? Bạn có thể gửi tài liệu học tập hoặc đặt bất cứ câu hỏi nào cho tôi.`;
+      } else if (lower.includes('quiz') || lower.includes('trắc nghiệm') || lower.includes('kiểm tra')) {
+        reply = `Tuyệt vời! Chúng ta hãy làm một câu hỏi trắc nghiệm Sinh học nhanh nhé:
+
+**Sự khác biệt chính về kết quả tế bào giữa Nguyên phân (Mitosis) và Giảm phân (Meiosis) là gì?**
+* **A)** Nguyên phân tạo 4 tế bào độc nhất, Giảm phân tạo 2 tế bào giống hệt.
+* **B)** Nguyên phân tạo 2 tế bào lưỡng bội (diploid) giống hệt nhau, Giảm phân tạo 4 tế bào giao tử đơn bội (haploid) độc nhất.
+* **C)** Nguyên phân chỉ xảy ra ở thực vật, Giảm phân chỉ xảy ra ở động vật.
+
+*Nhập đáp án A, B hoặc C của bạn bên dưới nhé!*`;
       }
 
       setMessages((prev) => [
@@ -1128,6 +1100,8 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
  */
 const EmptyState = () => {
   const setActiveConversation = useChatStore((s) => s.setActiveConversation);
+  const { data: settings } = useSettings();
+  const webName = settings?.web_name || 'Studifier';
   
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-6 py-12 max-w-sm mx-auto">
@@ -1135,7 +1109,7 @@ const EmptyState = () => {
         <MessageSquare className="h-8 w-8 text-indigo-600" />
       </div>
       <div className="space-y-2">
-        <h3 className="font-black text-slate-800 text-lg">Studifier AI Workspace</h3>
+        <h3 className="font-black text-slate-800 text-lg">{webName} AI Workspace</h3>
         <p className="text-xs text-slate-400 font-semibold leading-relaxed">
           Chọn cuộc trò chuyện Trợ lý AI ở trên cùng hoặc mở một cuộc trò chuyện nhóm học tập để bắt đầu nhắn tin.
         </p>

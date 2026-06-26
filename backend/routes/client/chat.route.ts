@@ -18,6 +18,9 @@ router.get("/users/search", ratelimit.authIpLimiter, middleware.authMiddleware, 
 // Gửi tin nhắn (fallback REST khi socket không hoạt động)
 router.post("/messages", ratelimit.authIpLimiter, middleware.authMiddleware, controller.sendMessage)
 
+// Lấy cấu hình WebRTC TURN server
+router.get("/turn", ratelimit.authIpLimiter, middleware.authMiddleware, controller.getTurnCredentials)
+
 // Endpoints cũ của backend
 router.get("/history/:userId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.getHistory)
 router.patch("/read/:userId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.markedReadPatch)

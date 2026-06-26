@@ -1,5 +1,5 @@
 import { Request, Response } from "express";
-import { editProfileService, forgotPasswordServiceSendMail, loginService, refreshTokenService, registerService, resetPasswordService, verifyOTPForgotPassword, verifyOTPRegister } from "../../services/client/user.service";
+import { editProfileService, forgotPasswordServiceSendMail, loginService, refreshTokenService, registerService, resetPasswordService, updateStatusService, verifyOTPForgotPassword, verifyOTPRegister } from "../../services/client/user.service";
 import { cookieConfig } from "../../config/cookie";
 import prisma from "../../config/prisma";
 
@@ -137,8 +137,13 @@ export const resetPasswordPost = async (req: Request, res: Response) => {
 export const userProfile = (req: Request, res: Response) => {
   try {
     const user = (req as any).user
+    // ẩn status nếu đã hết hạn
+    const now = new Date();
+    const effectiveStatus = user.statusExpiresAt && new Date(user.statusExpiresAt) > now
+      ? user.status
+      : null;
     res.status(200).json({
-      data: user,
+      data: { ...user, status: effectiveStatus },
       message: "Lấy thông tin profile thành công",
       code: 200
     })
@@ -165,8 +170,26 @@ export const editProfile = async (req: Request, res: Response) => {
       message: error.message
     });
   }
-
 }
+
+export const updateStatus = async (req: Request, res: Response) => {
+  try {
+    const user = (req as any).user;
+    const { status } = req.body;
+    if (status !== undefined && status !== null && typeof status === 'string' && status.trim().length > 80) {
+      return res.status(400).json({ code: 400, message: 'Status không được vượt quá 80 ký tự' });
+    }
+    const result = await updateStatusService(user.id, status ?? null);
+    res.status(200).json({
+      code: 200,
+      data: result,
+      message: 'Cập nhật trạng thái thành công'
+    });
+  } catch (error: any) {
+    res.status(400).json({ code: 400, message: error.message });
+  }
+};
+
 
 export const refreshTokenPost = async (req: Request, res: Response) => {
 
