@@ -699,3 +699,20 @@ export const uploadGroupChatFile = async (req: Request, res: Response) => {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }
 };
+
+//[GET] /chat/turn — Lấy thông tin cấu hình TURN server
+export const getTurnCredentials = async (req: Request, res: Response) => {
+  try {
+    const url = process.env.TURN_URL || '';
+    const username = process.env.TURN_USERNAME || '';
+    const credential = process.env.TURN_CREDENTIAL || '';
+
+    return res.status(200).json({
+      code: 200,
+      message: "Lấy cấu hình TURN thành công",
+      data: { url, username, credential }
+    });
+  } catch (error: any) {
+    return res.status(500).json({ code: 500, message: `Lỗi: ${error.message}` });
+  }
+};

@@ -1,10 +1,13 @@
-import { useState, memo } from 'react';
+import { useState, memo, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import { ROUTES } from '../constants';
 import { cn } from '../lib/utils';
+import { CallOverlay } from '../features/chat/components/CallOverlay';
+import { useCallStore } from '../store/useCallStore';
+import { getSocket } from '../socket/socket';
 
 // ——— Nav items config ———
 const NAV_ITEMS = [
@@ -135,6 +138,7 @@ const MainLayout = () => {
   const { data: profile } = useProfile();
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { setIncomingCall, status } = useCallStore();
 
   const handleLogout = () => {
     logout();
@@ -142,6 +146,32 @@ const MainLayout = () => {
   };
 
   const closeMobile = () => setIsMobileOpen(false);
+
+  // ——— Lắng nghe cuộc gọi đến từ bất kỳ trang nào ———
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleIncomingCall = (data: {
+      callerId: string;
+      callType: 'audio' | 'video';
+      callerInfo: { name: string; avatarUrl?: string | null };
+    }) => {
+      // Bỏ qua nếu đang trong cuộc gọi khác
+      if (status !== 'idle') {
+        socket.emit('call:reject', { callerId: data.callerId, reason: 'busy' });
+        return;
+      }
+      setIncomingCall({
+        callerId: data.callerId,
+        callType: data.callType,
+        callerInfo: data.callerInfo,
+      });
+    };
+
+    socket.on('call:incoming', handleIncomingCall);
+    return () => { socket.off('call:incoming', handleIncomingCall); };
+  }, [status, setIncomingCall]);
 
   // Avatar mặc định hoặc lấy từ profile
   const userAvatar = profile?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
@@ -159,6 +189,8 @@ const MainLayout = () => {
 
   return (
     <div className="min-h-screen bg-slate-50/30 flex flex-col md:flex-row overflow-hidden font-sans">
+      {/* CallOverlay — toàn cục, nằm trên tất cả nội dung */}
+      <CallOverlay />
       {/* Mobile Navbar Header */}
       <header className="md:hidden shrink-0 h-16 border-b bg-white flex items-center justify-between px-6 z-40">
         <div className="flex flex-col">

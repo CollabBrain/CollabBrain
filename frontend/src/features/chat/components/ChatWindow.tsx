@@ -27,6 +27,9 @@ import {
   Ban
 } from 'lucide-react';
 import { useChatStore, selectActiveMessages } from '../../../store/useChatStore';
+import { useCallStore } from '../../../store/useCallStore';
+import { useProfile } from '../../profile/hooks/useProfile';
+import { getSocket } from '../../../socket/socket';
 import {
   useInfiniteMessages,
   useSendMessage,
@@ -81,10 +84,14 @@ const ChatHeader = ({
   other,
   isOnline,
   onBack,
+  onCall,
+  callDisabled,
 }: {
   other: ChatUser;
   isOnline: boolean;
   onBack?: () => void;
+  onCall: (type: 'audio' | 'video') => void;
+  callDisabled?: boolean;
 }) => {
   const initials = (other.name || '')
     .split(' ')
@@ -147,10 +154,32 @@ const ChatHeader = ({
       </div>
 
       <div className="flex items-center gap-1">
-        <button className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Gọi thoại">
+        <button
+          className={cn(
+            'h-8 w-8 rounded-full flex items-center justify-center transition-colors',
+            callDisabled
+              ? 'text-muted-foreground/40 cursor-not-allowed'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground hover:text-indigo-600'
+          )}
+          title={callDisabled ? 'Người dùng offline hoặc đang bận' : 'Gọi thoại'}
+          onClick={() => !callDisabled && onCall('audio')}
+          disabled={callDisabled}
+          id="btn-voice-call"
+        >
           <Phone className="h-4 w-4" />
         </button>
-        <button className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Gọi video">
+        <button
+          className={cn(
+            'h-8 w-8 rounded-full flex items-center justify-center transition-colors',
+            callDisabled
+              ? 'text-muted-foreground/40 cursor-not-allowed'
+              : 'hover:bg-muted text-muted-foreground hover:text-foreground hover:text-indigo-600'
+          )}
+          title={callDisabled ? 'Người dùng offline hoặc đang bận' : 'Gọi video'}
+          onClick={() => !callDisabled && onCall('video')}
+          disabled={callDisabled}
+          id="btn-video-call"
+        >
           <Video className="h-4 w-4" />
         </button>
         <button className="h-8 w-8 rounded-full flex items-center justify-center hover:bg-muted transition-colors text-muted-foreground hover:text-foreground" title="Thêm tùy chọn">
@@ -214,6 +243,43 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   const other = getOtherParticipant(conversation, currentUserId);
   const isOtherOnline = other ? (onlineUsers[other.id] ?? other.isOnline ?? false) : false;
   const isOtherTyping = typingUserIds.some((id) => id !== currentUserId);
+
+  // ——— Call setup ———
+  const { startCall, status: callStatus } = useCallStore();
+  const { data: myProfile } = useProfile();
+
+  const handleStartCall = useCallback(async (callType: 'audio' | 'video') => {
+    if (!other) return;
+
+    try {
+      // Yêu cầu quyền Camera/Micro ngay lập tức tại event click để vượt rào Safari iOS
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: { echoCancellation: true, noiseSuppression: true },
+        video: callType === 'video' ? { facingMode: 'user' } : false,
+      });
+      // Lưu stream vào Store để dùng sau khi bên kia bắt máy
+      useCallStore.getState().setLocalStream(stream);
+
+      startCall(
+        { id: other.id, name: other.name || 'User', avatarUrl: other.avatarUrl },
+        callType
+      );
+      // Gửi tín hiệu call:request qua socket
+      const socket = getSocket();
+      if (socket) {
+        socket.emit('call:request', {
+          targetUserId: other.id,
+          callType,
+          callerInfo: {
+            name: myProfile?.name || 'User',
+            avatarUrl: myProfile?.avatarUrl || null,
+          },
+        });
+      }
+    } catch (err: any) {
+      alert(`Không thể gọi: ${err.message}. Vui lòng cấp quyền Camera/Micro.`);
+    }
+  }, [other, startCall, myProfile]);
 
   // ——— Scroll helpers ———
   const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
@@ -437,7 +503,13 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
 
   return (
     <div className="flex flex-col h-full bg-background relative" onClick={closeContextMenu}>
-      <ChatHeader other={other} isOnline={isOtherOnline} onBack={onBackMobile} />
+      <ChatHeader
+        other={other}
+        isOnline={isOtherOnline}
+        onBack={onBackMobile}
+        onCall={handleStartCall}
+        callDisabled={!isOtherOnline || callStatus !== 'idle'}
+      />
 
       {/* Pinned Messages Bar */}
       {pinnedMessages.length > 0 && (
@@ -548,6 +620,7 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
                   showAvatar={!isMine}
                   isFirstInGroup={isFirstInGroup}
                   isLastInGroup={isLastInGroup}
+                  onCallAgain={handleStartCall}
                 />
               </div>
             </div>

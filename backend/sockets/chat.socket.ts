@@ -72,6 +72,141 @@ export const chatSocket = (io: Server) => {
     })
 
     // ================================================================
+    // ——— WEBRTC SIGNALING (CHAT 1-1) ———
+    // ================================================================
+
+    /**
+     * BƯỚC 1: Caller yêu cầu gọi tới Callee
+     * Payload: { targetUserId, callType: 'audio' | 'video', callerInfo: { name, avatarUrl } }
+     */
+    socket.on("call:request", ({ targetUserId, callType, callerInfo }: {
+      targetUserId: string,
+      callType: 'audio' | 'video',
+      callerInfo: { name: string, avatarUrl?: string }
+    }) => {
+      // Kiểm tra người nhận có online không
+      if (!onlineUsers.has(targetUserId)) {
+        socket.emit("call:error", { code: "USER_OFFLINE", message: "Người dùng không online" })
+        return
+      }
+
+      console.log(`[Call] ${user.id} → ${targetUserId} [${callType}]`)
+
+      // Forward tín hiệu gọi đến Callee
+      io.to(targetUserId).emit("call:incoming", {
+        callerId: user.id,
+        callType,
+        callerInfo: {
+          name: callerInfo.name || "Người dùng",
+          avatarUrl: callerInfo.avatarUrl || null
+        }
+      })
+    })
+
+    /**
+     * BƯỚC 2A: Callee đồng ý cuộc gọi → báo lại cho Caller
+     * Payload: { callerId }
+     */
+    socket.on("call:accept", ({ callerId }: { callerId: string }) => {
+      console.log(`[Call] ${user.id} accepted call from ${callerId}`)
+      io.to(callerId).emit("call:accepted", { calleeId: user.id })
+    })
+
+    /**
+     * BƯỚC 2B: Callee từ chối cuộc gọi → báo lại Caller
+     * Payload: { callerId, reason?: string }
+     */
+    socket.on("call:reject", ({ callerId, reason }: { callerId: string, reason?: string }) => {
+      console.log(`[Call] ${user.id} rejected call from ${callerId}`)
+      io.to(callerId).emit("call:rejected", {
+        calleeId: user.id,
+        reason: reason || "declined"
+      })
+    })
+
+    /**
+     * BƯỚC 3: Caller gửi WebRTC Offer SDP cho Callee
+     * Payload: { targetUserId, offer: RTCSessionDescriptionInit }
+     */
+    socket.on("call:offer", ({ targetUserId, offer }: {
+      targetUserId: string,
+      offer: RTCSessionDescriptionInit
+    }) => {
+      io.to(targetUserId).emit("call:offer", {
+        callerId: user.id,
+        offer
+      })
+    })
+
+    /**
+     * BƯỚC 4: Callee gửi WebRTC Answer SDP cho Caller
+     * Payload: { targetUserId, answer: RTCSessionDescriptionInit }
+     */
+    socket.on("call:answer", ({ targetUserId, answer }: {
+      targetUserId: string,
+      answer: RTCSessionDescriptionInit
+    }) => {
+      io.to(targetUserId).emit("call:answer", {
+        calleeId: user.id,
+        answer
+      })
+    })
+
+    /**
+     * BƯỚC 5 (song song): Gửi ICE Candidate (trao đổi liên tục giữa 2 bên)
+     * Payload: { targetUserId, candidate: RTCIceCandidateInit }
+     */
+    socket.on("call:ice-candidate", ({ targetUserId, candidate }: {
+      targetUserId: string,
+      candidate: RTCIceCandidateInit
+    }) => {
+      io.to(targetUserId).emit("call:ice-candidate", {
+        senderId: user.id,
+        candidate
+      })
+    })
+
+    /**
+     * Kết thúc / huỷ cuộc gọi — gửi tới cả 2 phía
+     * Payload: { targetUserId }
+     */
+    socket.on("call:end", ({ targetUserId }: { targetUserId: string }) => {
+      console.log(`[Call] ${user.id} ended call with ${targetUserId}`)
+      io.to(targetUserId).emit("call:ended", { byUserId: user.id })
+    })
+
+    /**
+     * Ghi nhận lịch sử cuộc gọi vào cửa sổ chat
+     * Payload: { targetUserId, callType: 'audio'|'video', status: 'missed'|'rejected'|'ended', duration?: string }
+     */
+    socket.on("call:log", async ({ targetUserId, callType, status, duration }: { targetUserId: string, callType: string, status: string, duration?: string }) => {
+      try {
+        const content = `[CALL:${callType}:${status}${duration ? `:${duration}` : ''}]`
+        const savedMessage = await createMessage(user.id, targetUserId, content, "TEXT")
+
+        // Broadcast cho người nhận
+        io.to(targetUserId).emit("chat:new_message", { 
+          message: { 
+            ...savedMessage, 
+            conversationId: user.id, 
+            type: "text" 
+          } 
+        })
+        
+        // Gửi lại cho người gửi
+        io.to(user.id).emit("chat:new_message", { 
+          message: { 
+            ...savedMessage, 
+            conversationId: targetUserId, 
+            type: "text" 
+          } 
+        })
+      } catch (e) {
+        console.error("[Socket] call:log error:", e)
+      }
+    })
+
+    // ================================================================
     // ——— GROUP CHAT ———
     // ================================================================
 
