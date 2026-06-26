@@ -390,7 +390,7 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
         const res = await uploadMutation.mutateAsync(selectedFile.file);
         const data = res.data.data;
         if (data) {
-          finalContent = data.url;
+          finalContent = `${data.url}?filename=${encodeURIComponent(data.fileName)}`;
         }
       } catch (error) {
         console.error("Upload error:", error);

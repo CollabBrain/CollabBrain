@@ -50,6 +50,19 @@ const formatDuration = (secondsStr: string) => {
   return remain > 0 ? `${mins} phút ${remain} giây` : `${mins} phút`;
 };
 
+const extractFileNameFromUrl = (url: string) => {
+  try {
+    const urlObj = new URL(url);
+    const filenameParam = urlObj.searchParams.get('filename');
+    if (filenameParam) {
+      return decodeURIComponent(filenameParam);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return url.split('/').pop()?.split('?')[0] || 'Tài liệu đính kèm';
+};
+
 interface CallLogBubbleProps {
   type: string;
   status: string;
@@ -185,7 +198,7 @@ const MessageBubble = ({
           {/* Message Content */}
           {message.isRecalled ? (
             <span className="italic opacity-80">{message.content}</span>
-          ) : message.type === 'image' || message.type === 'IMAGE' ? (
+          ) : message.type.toLowerCase() === 'image' ? (
             <div className="mt-1 mb-1">
               <img
                 src={message.content}
@@ -195,7 +208,7 @@ const MessageBubble = ({
                 loading="lazy"
               />
             </div>
-          ) : message.type === 'file' || message.type === 'FILE' ? (
+          ) : message.type.toLowerCase() === 'file' ? (
             <a
               href={message.content}
               target="_blank"
@@ -213,7 +226,7 @@ const MessageBubble = ({
               </div>
               <div className="flex-1 min-w-0 flex flex-col">
                 <span className="font-medium text-sm truncate">
-                  {message.content.split('/').pop()?.split('?')[0] || 'Tài liệu đính kèm'}
+                  {extractFileNameFromUrl(message.content)}
                 </span>
                 <span className="text-xs opacity-70">Nhấn để tải xuống</span>
               </div>

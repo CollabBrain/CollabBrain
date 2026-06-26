@@ -2,6 +2,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { ROUTES } from '../constants';
 import { ArrowRight, ExternalLink } from 'lucide-react';
+import { useSettings } from '../hooks/useSettings';
 
 /**
  * LandingPage — Trang chủ giới thiệu Studifier (Mockup 1).
@@ -10,6 +11,10 @@ import { ArrowRight, ExternalLink } from 'lucide-react';
 const LandingPage = () => {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { data: settings } = useSettings();
+
+  const webName = settings?.web_name || 'Studifier';
+  const footerText = settings?.footer || `Studifier &copy; ${new Date().getFullYear()} &bull; AI Learning Ecosystem`;
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
@@ -50,7 +55,7 @@ const LandingPage = () => {
       {/* Top Header Logo */}
       <header className="max-w-7xl mx-auto w-full px-6 md:px-12 py-6 shrink-0 z-10 flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
-          <span className="text-2xl font-black text-indigo-600 tracking-tight">Studifier</span>
+          <span className="text-2xl font-black text-indigo-600 tracking-tight">{webName}</span>
           <span className="text-[9px] uppercase font-bold text-slate-400 tracking-widest pl-0.5">
             AI LEARNING
           </span>
@@ -74,7 +79,7 @@ const LandingPage = () => {
         <div className="flex-1 space-y-8 text-left max-w-xl">
           <div className="space-y-4">
             <h2 className="text-[36px] md:text-[56px] font-black text-indigo-600 leading-none tracking-tight">
-              Studifier
+              {webName}
             </h2>
             <h1 className="text-[28px] md:text-[44px] font-extrabold text-slate-800 leading-tight tracking-tight">
               Your Premium AI Learning Partner
@@ -137,9 +142,10 @@ const LandingPage = () => {
       </main>
 
       {/* Footer Branding Copyright */}
-      <footer className="max-w-7xl mx-auto w-full px-6 md:px-12 py-6 text-center text-xs font-semibold text-slate-400 shrink-0 z-10">
-        Studifier &copy; {new Date().getFullYear()} &bull; AI Learning Ecosystem
-      </footer>
+      <footer
+        className="max-w-7xl mx-auto w-full px-6 md:px-12 py-6 text-center text-xs font-semibold text-slate-400 shrink-0 z-10"
+        dangerouslySetInnerHTML={{ __html: footerText }}
+      />
 
     </div>
   );

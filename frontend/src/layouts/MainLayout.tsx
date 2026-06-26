@@ -1,6 +1,6 @@
 import { useState, memo, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X } from 'lucide-react';
+import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, CheckSquare } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import { ROUTES } from '../constants';
@@ -8,11 +8,14 @@ import { cn } from '../lib/utils';
 import { CallOverlay } from '../features/chat/components/CallOverlay';
 import { useCallStore } from '../store/useCallStore';
 import { getSocket } from '../socket/socket';
+import { useSettings } from '../hooks/useSettings';
+import { NotificationBell } from '../components/NotificationBell';
 
 // ——— Nav items config ———
 const NAV_ITEMS = [
   { to: ROUTES.CHAT, label: 'Chat', icon: MessageSquare },
   { to: ROUTES.DOCUMENTS, label: 'My Documents', icon: FileText },
+  { to: '/todolist', label: 'Todo List', icon: CheckSquare },
   { to: '/friends', label: 'Friends', icon: User },
   { to: '/groups', label: 'Groups', icon: Users },
   { to: ROUTES.PROFILE, label: 'Profile', icon: UserCircle },
@@ -26,6 +29,7 @@ interface SidebarContentProps {
   userTier: string;
   onNavClick?: () => void;
   onLogout: () => void;
+  webName?: string;
 }
 
 const SidebarContent = memo(({
@@ -35,6 +39,7 @@ const SidebarContent = memo(({
   userTier,
   onNavClick,
   onLogout,
+  webName,
 }: SidebarContentProps) => {
   const isActive = (path: string) => {
     if (path === ROUTES.CHAT) return pathname.startsWith(ROUTES.CHAT);
@@ -47,7 +52,7 @@ const SidebarContent = memo(({
         {/* Logo Branding */}
         <div className="flex flex-col gap-0.5 px-2">
           <Link to="/" className="text-[26px] font-extrabold text-indigo-600 tracking-tight flex items-center gap-1.5 hover:opacity-90">
-            Studifier
+            {webName || 'Studifier'}
           </Link>
           <span className="text-[9px] uppercase font-bold text-slate-400 tracking-widest pl-0.5">
             AI LEARNING
@@ -105,6 +110,7 @@ const SidebarContent = memo(({
 
         {/* Utility Buttons: Settings & Logout */}
         <div className="flex items-center justify-between px-2">
+          <NotificationBell />
           <Link
             to={ROUTES.PROFILE}
             title="Settings"
@@ -173,6 +179,9 @@ const MainLayout = () => {
     return () => { socket.off('call:incoming', handleIncomingCall); };
   }, [status, setIncomingCall]);
 
+  const { data: settings } = useSettings();
+  const webName = settings?.web_name || 'Studifier';
+
   // Avatar mặc định hoặc lấy từ profile
   const userAvatar = profile?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
   const userName = profile?.name || 'User';
@@ -185,6 +194,7 @@ const MainLayout = () => {
     userName,
     userTier,
     onLogout: handleLogout,
+    webName,
   };
 
   return (
@@ -194,7 +204,7 @@ const MainLayout = () => {
       {/* Mobile Navbar Header */}
       <header className="md:hidden shrink-0 h-16 border-b bg-white flex items-center justify-between px-6 z-40">
         <div className="flex flex-col">
-          <span className="text-xl font-black text-indigo-600 tracking-tight">Studifier</span>
+          <span className="text-xl font-black text-indigo-600 tracking-tight">{webName}</span>
           <span className="text-[8px] font-bold text-slate-400 tracking-wider">AI LEARNING</span>
         </div>
         <button
