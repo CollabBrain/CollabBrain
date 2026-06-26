@@ -250,47 +250,7 @@ const DashboardPage = () => {
         </div>
       </div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {[
-          { label: "Tổng lịch học", value: totalCount, icon: ListTodo, color: "text-indigo-600 bg-indigo-50 border-indigo-100", gradient: "from-indigo-500 to-indigo-600" },
-          { label: "Đang thực hiện", value: activeCount, icon: Clock, color: "text-amber-600 bg-amber-50 border-amber-100", gradient: "from-amber-500 to-amber-600" },
-          { label: "Đã hoàn thành", value: completedCount, icon: CheckCircle, color: "text-emerald-600 bg-emerald-50 border-emerald-100", gradient: "from-emerald-500 to-emerald-600" },
-          { label: "Quá hạn", value: overdueCount, icon: AlertCircle, color: "text-rose-600 bg-rose-50 border-rose-100", gradient: "from-rose-500 to-rose-600" }
-        ].map((stat, idx) => (
-          <div key={idx} className="bg-white border border-slate-100 rounded-3xl p-5 shadow-[0_4px_24px_rgba(99,102,241,0.01)] flex items-center justify-between hover:shadow-lg hover:shadow-slate-100/50 transition-all duration-300">
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-450 uppercase tracking-wider">{stat.label}</span>
-              <p className="text-2xl font-black text-slate-800">{stat.value}</p>
-            </div>
-            <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${stat.color}`}>
-              <stat.icon className="w-5 h-5" />
-            </div>
-          </div>
-        ))}
-      </div>
 
-      {/* Progress Bar */}
-      {totalCount > 0 && (
-        <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-[0_4px_24px_rgba(99,102,241,0.01)]">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <TrendingUp className="w-4 h-4 text-indigo-600" />
-              <span className="text-xs font-black text-slate-700">Tiến độ hoàn thành</span>
-            </div>
-            <span className="text-sm font-black text-indigo-600">{completionRate}%</span>
-          </div>
-          <div className="w-full h-3 bg-slate-100 rounded-full overflow-hidden">
-            <div
-              className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-700 ease-out"
-              style={{ width: `${completionRate}%` }}
-            />
-          </div>
-          <p className="text-[10px] font-bold text-slate-400 mt-2">
-            {completedCount} / {totalCount} lịch học đã hoàn thành
-          </p>
-        </div>
-      )}
 
       {isLoading ? (
         <div className="py-16 flex flex-col items-center justify-center gap-2">
