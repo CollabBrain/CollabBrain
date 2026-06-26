@@ -1,6 +1,6 @@
 import { useState, memo, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, CheckSquare } from 'lucide-react';
+import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, CheckSquare, Home } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import { ROUTES } from '../constants';
@@ -13,6 +13,7 @@ import { NotificationBell } from '../components/NotificationBell';
 
 // ——— Nav items config ———
 const NAV_ITEMS = [
+  { to: ROUTES.DASHBOARD, label: 'Home', icon: Home },
   { to: ROUTES.CHAT, label: 'Chat', icon: MessageSquare },
   { to: ROUTES.DOCUMENTS, label: 'My Documents', icon: FileText },
   { to: '/todolist', label: 'Todo List', icon: CheckSquare },
