@@ -9,6 +9,8 @@ export const getListFriend = async (id: string) => {
       u.email,
       u.avatar_url AS "avatarUrl",
       u.bio,
+      u.status,
+      u.status_expires_at AS "statusExpiresAt",
       u.created_at AS "createdAt"
     FROM friendships f
     JOIN users u 

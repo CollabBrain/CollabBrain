@@ -6,6 +6,8 @@ export interface User {
   avatarUrl: string | null;
   coverUrl: string | null;
   bio: string | null;
+  status: string | null;         // GitHub-style status (max 80 chars)
+  statusExpiresAt: string | null; // ISO string, expires after 24h
   isActive: boolean;
   isDeleted: boolean;
   createdAt: string;
@@ -52,6 +54,10 @@ export interface EditProfilePayload {
   avatarUrl?: string;
   coverUrl?: string;
   bio?: string;
+}
+
+export interface UpdateStatusPayload {
+  status: string | null; // null = xóa status
 }
 
 // ========== Auth Response ==========

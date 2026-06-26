@@ -372,6 +372,14 @@ export const useChatSocket = () => {
     [setOnlineStatus]
   );
 
+  const handleInitialOnline = useCallback(
+    ({ onlineUserIds }: { onlineUserIds: string[] }) => {
+      // Bulk-set tất cả users hiện đang online khi mới kết nối
+      useChatStore.getState().setMultipleOnlineStatus(onlineUserIds, true);
+    },
+    []
+  );
+
   const handleMessageRecalled = useCallback(
     ({ messageId, conversationId }: { messageId: string; conversationId: string }) => {
       useChatStore.setState((state) => {
@@ -436,6 +444,7 @@ export const useChatSocket = () => {
     socket.on('chat:new_message', handleNewMessage);
     socket.on('chat:typing', handleTyping);
     socket.on('user:online_status', handleOnlineStatus);
+    socket.on('user:initial_online', handleInitialOnline);
     socket.on('chat:message_recalled', handleMessageRecalled);
     socket.on('chat:message_deleted', handleMessageDeleted);
     socket.on('chat:message_pinned', handleMessagePinned);
@@ -444,11 +453,12 @@ export const useChatSocket = () => {
       socket.off('chat:new_message', handleNewMessage);
       socket.off('chat:typing', handleTyping);
       socket.off('user:online_status', handleOnlineStatus);
+      socket.off('user:initial_online', handleInitialOnline);
       socket.off('chat:message_recalled', handleMessageRecalled);
       socket.off('chat:message_deleted', handleMessageDeleted);
       socket.off('chat:message_pinned', handleMessagePinned);
     };
-  }, [accessToken, handleNewMessage, handleTyping, handleOnlineStatus, handleMessageRecalled, handleMessageDeleted]);
+  }, [accessToken, handleNewMessage, handleTyping, handleOnlineStatus, handleInitialOnline, handleMessageRecalled, handleMessageDeleted]);
 };
 
 // ========== Emit helpers ==========

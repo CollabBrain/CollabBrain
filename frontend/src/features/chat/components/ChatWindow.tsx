@@ -42,6 +42,7 @@ import {
 import MessageBubble, { TypingIndicator, DateDivider } from './MessageBubble';
 import { cn } from '../../../lib/utils';
 import type { Conversation, ChatUser, Message } from '../../../types/chat.types';
+import { EmojiButton } from '../../../components/common/EmojiPicker';
 
 // Stable empty array reference to prevent re-render loops
 const EMPTY_STRINGS: string[] = [];
@@ -93,6 +94,17 @@ const ChatHeader = ({
     .toUpperCase()
     .slice(0, 2) || '?';
 
+  let statusText = '';
+  if (other.status) {
+    if (other.statusExpiresAt) {
+      if (new Date(other.statusExpiresAt) > new Date()) {
+        statusText = other.status;
+      }
+    } else {
+      statusText = other.status;
+    }
+  }
+
   return (
     <div className="flex items-center gap-3 px-4 py-3 border-b border-border bg-card shrink-0">
       {onBack && (
@@ -119,7 +131,14 @@ const ChatHeader = ({
       </div>
 
       <div className="flex-1 min-w-0">
-        <p className="font-semibold text-sm truncate">{other.name || 'User'}</p>
+        <div className="flex items-center gap-2">
+          <p className="font-semibold text-sm truncate">{other.name || 'User'}</p>
+          {statusText && (
+            <span className="text-xs border border-indigo-100 bg-indigo-50 text-indigo-600 px-1.5 py-px rounded-md truncate max-w-[150px]" title={statusText}>
+              {statusText}
+            </span>
+          )}
+        </div>
         <p className="text-xs text-muted-foreground">
           {isOnline
             ? <span className="text-emerald-600 font-medium">Đang hoạt động</span>
@@ -395,6 +414,25 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
     textareaRef.current?.focus();
   };
 
+  // Insert emoji vào vị trí con trỏ trong textarea
+  const handleEmojiSelect = useCallback((emoji: string) => {
+    const ta = textareaRef.current;
+    if (!ta) {
+      setInputValue(prev => prev + emoji);
+      return;
+    }
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    const newValue = ta.value.slice(0, start) + emoji + ta.value.slice(end);
+    setInputValue(newValue);
+    // Restore cursor position sau emoji
+    requestAnimationFrame(() => {
+      ta.selectionStart = start + emoji.length;
+      ta.selectionEnd = start + emoji.length;
+      ta.focus();
+    });
+  }, []);
+
   if (!other) return null;
 
   return (
@@ -595,6 +633,9 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
           >
             <Paperclip className="h-5 w-5" />
           </button>
+
+          {/* Emoji Picker */}
+          <EmojiButton onEmojiSelect={handleEmojiSelect} />
           
           <div className="flex-1 relative">
             <textarea

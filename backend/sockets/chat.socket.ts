@@ -24,7 +24,10 @@ export const chatSocket = (io: Server) => {
       console.error("[Socket] Lỗi join group rooms:", e)
     }
 
-    // Thông báo user online cho tất cả
+    // Gửi danh sách online hiện tại CHỈ cho user vừa connect (không broadcast)
+    socket.emit("user:initial_online", { onlineUserIds: Array.from(onlineUsers.keys()) })
+
+    // Thông báo user online cho tất cả (ngoại trừ bản thân)
     socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: true })
 
     // ================================================================
@@ -34,24 +37,35 @@ export const chatSocket = (io: Server) => {
     socket.on("chat:send_message", async (data) => {
       try {
         const { conversationId, content, type = "text", replyToId } = data
+        // Trong chat 1-1, conversationId chính là id của người nhận (receiverId)
         const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any, replyToId)
 
-        const formattedMessage = {
-          ...savedMessage,
-          conversationId,
-          type: savedMessage.type.toLowerCase()
-        }
-
-        io.to(conversationId).emit("chat:new_message", { message: formattedMessage })
-        socket.emit("chat:new_message", { message: formattedMessage })
+        // Broadcast cho người nhận
+        io.to(conversationId).emit("chat:new_message", { 
+          message: { 
+            ...savedMessage, 
+            conversationId: user.id, // Đối với người nhận, conversation là với người gửi
+            type: savedMessage.type.toLowerCase() 
+          } 
+        })
+        
+        // Gửi lại cho người gửi (để tất cả các tab của người gửi đều update)
+        io.to(user.id).emit("chat:new_message", { 
+          message: { 
+            ...savedMessage, 
+            conversationId: conversationId, 
+            type: savedMessage.type.toLowerCase() 
+          } 
+        })
       } catch (error: any) {
         socket.emit("chat:error", { message: error.message })
       }
     })
 
     socket.on("chat:typing", ({ conversationId, isTyping }: { conversationId: string; isTyping: boolean }) => {
-      io.to(conversationId).emit("chat:typing", {
-        conversationId,
+      // Chỉ broadcast cho người nhận (receiverId)
+      socket.to(conversationId).emit("chat:typing", {
+        conversationId: user.id, // THE FRONTEND USES conversationId TO KNOW WHICH CHAT IS TYPING
         userId: user.id,
         isTyping
       })

@@ -22,5 +22,7 @@ export interface UserTypes {
   name?: string,
   avatarUrl?: string,
   coverUrl?: string,
-  bio?: string
+  bio?: string,
+  status?: string | null,
+  statusExpiresAt?: Date | null
 }

@@ -138,6 +138,8 @@ export const getConversations = async (req: Request, res: Response) => {
           name: friend.name,
           email: friend.email,
           avatarUrl: friend.avatarUrl,
+          status: friend.status,
+          statusExpiresAt: friend.statusExpiresAt,
         }
       ];
 
