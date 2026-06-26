@@ -1,6 +1,6 @@
 import { useState, memo } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, AlertOctagon, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, AlertOctagon, LogOut, Menu, X, Settings } from 'lucide-react';
 import { useAdminAuthStore } from '../store/useAdminAuthStore';
 import { cn } from '../lib/utils';
 
@@ -9,6 +9,7 @@ const ADMIN_NAV_ITEMS = [
   { to: '/admin/users', label: 'Quản lý Users', icon: Users },
   { to: '/admin/groups', label: 'Quản lý Groups', icon: ShieldAlert },
   { to: '/admin/reports', label: 'Báo cáo vi phạm', icon: AlertOctagon },
+  { to: '/admin/settings', label: 'Cài đặt hệ thống', icon: Settings },
 ];
 
 interface SidebarProps {

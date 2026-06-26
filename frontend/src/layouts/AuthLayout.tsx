@@ -1,6 +1,7 @@
 import { Outlet } from 'react-router-dom';
 import { APP_NAME } from '../constants';
 import { BookOpen, Users, Zap, Award } from 'lucide-react';
+import { useSettings } from '../hooks/useSettings';
 
 const features = [
   { icon: BookOpen, text: 'Thư viện tài liệu phong phú' },
@@ -10,6 +11,9 @@ const features = [
 ];
 
 const AuthLayout = () => {
+  const { data: settings } = useSettings();
+  const webName = settings?.web_name || APP_NAME;
+
   return (
     <div className="min-h-screen grid lg:grid-cols-2 bg-background">
       {/* ——— Left panel: Branding + Features */}
@@ -34,7 +38,7 @@ const AuthLayout = () => {
             <div className="h-10 w-10 rounded-xl bg-white/20 backdrop-blur flex items-center justify-center">
               <BookOpen className="h-5 w-5 text-white" />
             </div>
-            <span className="text-white font-bold text-xl tracking-tight">{APP_NAME}</span>
+            <span className="text-white font-bold text-xl tracking-tight">{webName}</span>
           </div>
 
           {/* Hero text */}
@@ -64,9 +68,10 @@ const AuthLayout = () => {
           </div>
 
           {/* Footer */}
-          <p className="text-white/30 text-xs">
-            © 2026 {APP_NAME}. All rights reserved.
-          </p>
+          <p 
+            className="text-white/30 text-xs"
+            dangerouslySetInnerHTML={{ __html: settings?.footer || `© 2026 ${webName}. All rights reserved.` }}
+          />
         </div>
       </div>
 
@@ -78,7 +83,7 @@ const AuthLayout = () => {
             <div className="h-9 w-9 rounded-xl bg-edu-gradient flex items-center justify-center">
               <BookOpen className="h-4 w-4 text-white" />
             </div>
-            <span className="font-bold text-lg tracking-tight">{APP_NAME}</span>
+            <span className="font-bold text-lg tracking-tight">{webName}</span>
           </div>
 
           <Outlet />

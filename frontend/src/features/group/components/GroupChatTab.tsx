@@ -56,7 +56,18 @@ const Avatar = ({ name, avatarUrl, size = 'sm' }: { name: string; avatarUrl?: st
 /** Thẻ file đính kèm (giống Messenger) */
 const FileCard = ({ url, content }: { url: string; content: string }) => {
   if (!url) return null;
-  const fileName = url.split('/').pop()?.split('?')[0] || 'file';
+  let fileName = 'file';
+  try {
+    const urlObj = new URL(url);
+    const filenameParam = urlObj.searchParams.get('filename');
+    if (filenameParam) {
+      fileName = decodeURIComponent(filenameParam);
+    } else {
+      fileName = url.split('/').pop()?.split('?')[0] || 'file';
+    }
+  } catch (e) {
+    fileName = url.split('/').pop()?.split('?')[0] || 'file';
+  }
   return (
     <a
       href={url}

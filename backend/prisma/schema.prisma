@@ -95,6 +95,7 @@ model User {
   messageMentions     MessageMention[]
   reportsSent         Report[]          @relation("Reporter")
   reportsReceived     Report[]          @relation("ReportedUser")
+  todos               Todo[]
   @@map("users")
 }
 
@@ -266,4 +267,32 @@ model Report {
   targetGroup   Group?       @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
 
   @@map("reports")
+}
+
+model SiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
+
+model Todo {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  title       String
+  description String?
+  dueDate     DateTime? @map("due_date")
+  isCompleted Boolean   @default(false) @map("is_completed")
+  isNotify    Boolean   @default(false) @map("is_notify")
+  attachments String?   @map("attachments")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("todos")
 }

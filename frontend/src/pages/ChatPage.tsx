@@ -5,6 +5,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import { initSocket } from '../socket/socket';
 import { ErrorBoundary } from '../components/ErrorBoundary';
+import { useSettings } from '../hooks/useSettings';
 
 // Lazy imports to isolate crashes
 import ChatSidebar from '../features/chat/components/ChatSidebar';
@@ -153,6 +154,8 @@ const ChatPage = () => {
  */
 const AIAssistantWindow = ({ onBackMobile }: { onBackMobile: () => void }) => {
   const { data: profile } = useProfile();
+  const { data: settings } = useSettings();
+  const webName = settings?.web_name || 'Studifier';
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
   const [inputValue, setInputValue] = useState('');
@@ -213,7 +216,7 @@ In short, mitosis makes clones for growth, while meiosis makes unique cells.`,
       
       const lower = text.toLowerCase();
       if (lower.includes('hello') || lower.includes('hi') || lower.includes('xin chào')) {
-        reply = `Xin chào ${profile?.name || 'bạn'}! Tôi là Trợ lý học tập AI của Studifier. Hôm nay tôi có thể hỗ trợ gì cho bạn? Bạn có thể gửi tài liệu học tập hoặc đặt bất cứ câu hỏi nào cho tôi.`;
+        reply = `Xin chào ${profile?.name || 'bạn'}! Tôi là Trợ lý học tập AI của ${webName}. Hôm nay tôi có thể hỗ trợ gì cho bạn? Bạn có thể gửi tài liệu học tập hoặc đặt bất cứ câu hỏi nào cho tôi.`;
       } else if (lower.includes('quiz') || lower.includes('trắc nghiệm') || lower.includes('kiểm tra')) {
         reply = `Tuyệt vời! Chúng ta hãy làm một câu hỏi trắc nghiệm Sinh học nhanh nhé:
 
@@ -508,6 +511,8 @@ In short, mitosis makes clones for growth, while meiosis makes unique cells.`,
  */
 const EmptyState = () => {
   const setActiveConversation = useChatStore((s) => s.setActiveConversation);
+  const { data: settings } = useSettings();
+  const webName = settings?.web_name || 'Studifier';
   
   return (
     <div className="flex flex-col items-center justify-center h-full text-center px-6 gap-6 py-12 max-w-sm mx-auto">
@@ -515,7 +520,7 @@ const EmptyState = () => {
         <MessageSquare className="h-8 w-8 text-indigo-600" />
       </div>
       <div className="space-y-2">
-        <h3 className="font-black text-slate-800 text-lg">Studifier AI Workspace</h3>
+        <h3 className="font-black text-slate-800 text-lg">{webName} AI Workspace</h3>
         <p className="text-xs text-slate-400 font-semibold leading-relaxed">
           Chọn cuộc trò chuyện Trợ lý AI ở trên cùng hoặc mở một cuộc trò chuyện nhóm học tập để bắt đầu nhắn tin.
         </p>
