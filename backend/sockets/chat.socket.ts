@@ -210,6 +210,19 @@ export const chatSocket = (io: Server) => {
     // ——— GROUP CHAT ———
     // ================================================================
 
+    socket.on("group:join", ({ groupId }: { groupId: string }) => {
+      if (groupId) {
+        socket.join(`group:${groupId}`)
+        // console.log(`[Socket] User ${user.id} joined group:${groupId}`)
+      }
+    })
+
+    socket.on("group:leave", ({ groupId }: { groupId: string }) => {
+      if (groupId) {
+        socket.leave(`group:${groupId}`)
+      }
+    })
+
     // --- group:send_message ---
     socket.on("group:send_message", async (data) => {
       try {
