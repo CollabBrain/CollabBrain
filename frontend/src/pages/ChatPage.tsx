@@ -12,6 +12,7 @@ import ChatWindow from '../features/chat/components/ChatWindow';
 
 import { getConversationsApi } from '../features/chat/services/chat.service';
 import { getSocket } from '../socket/socket';
+import { useChatSocket } from '../features/chat/hooks/useChat';
 import type { Conversation, SocketNewMessage, SocketTypingEvent, SocketOnlineStatus } from '../types/chat.types';
 
 /**
@@ -88,52 +89,8 @@ const ChatPage = () => {
     })();
   }, [accessToken]);
 
-  // Register socket events (once)
-  const socketRegisteredRef = useRef(false);
-  useEffect(() => {
-    if (!accessToken || socketRegisteredRef.current) return;
-    const socket = getSocket();
-    if (!socket) return;
-    socketRegisteredRef.current = true;
-
-    const handleNewMessage = ({ message }: SocketNewMessage) => {
-      useChatStore.getState().addMessage(message);
-      const convs = useChatStore.getState().conversations;
-      const conv = convs.find((c) => c.id === message.conversationId);
-      if (conv) {
-        let myId = '';
-        try {
-          const payload = JSON.parse(atob(accessToken.split('.')[1]));
-          myId = payload.id ?? payload.sub ?? payload.userId ?? '';
-        } catch {}
-
-        const isFromMe = message.senderId === myId;
-        useChatStore.getState().addOrUpdateConversation({
-          ...conv,
-          lastMessage: message,
-          updatedAt: message.createdAt,
-          unreadCount: isFromMe ? conv.unreadCount : conv.unreadCount + 1,
-        });
-      }
-    };
-    const handleTyping = ({ conversationId, userId, isTyping }: SocketTypingEvent) => {
-      useChatStore.getState().setTyping(conversationId, userId, isTyping);
-    };
-    const handleOnlineStatus = ({ userId, isOnline }: SocketOnlineStatus) => {
-      useChatStore.getState().setOnlineStatus(userId, isOnline);
-    };
-
-    socket.on('chat:new_message', handleNewMessage);
-    socket.on('chat:typing', handleTyping);
-    socket.on('user:online_status', handleOnlineStatus);
-
-    return () => {
-      socket.off('chat:new_message', handleNewMessage);
-      socket.off('chat:typing', handleTyping);
-      socket.off('user:online_status', handleOnlineStatus);
-      socketRegisteredRef.current = false;
-    };
-  }, [accessToken]);
+  // Register all chat socket events (handles initial_online, typing, new_message, recall, pin, etc.)
+  useChatSocket();
 
   // Switch mobile view when conversation is selected
   useEffect(() => {

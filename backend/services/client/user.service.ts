@@ -130,8 +130,20 @@ export const resetPasswordService = async ({email,otp, password}:ResetPassword)=
 export const editProfileService = async(id: string, payload: UserTypes)=>{
 const user = await updateDataUser(id, payload)
 return user
-
 }
+
+/** Đặt/xóa status của user (tự hết hạn sau 24h) */
+export const updateStatusService = async (id: string, status: string | null) => {
+  const data = status && status.trim()
+    ? {
+        status: status.trim().slice(0, 80),
+        statusExpiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000) // +24h
+      }
+    : { status: null, statusExpiresAt: null };
+
+  return updateDataUser(id, data);
+};
+
 //Flow:  Verify refresh token   Tìm user  Tạo lại access token
 export const refreshTokenService = async(refreshToken: string)=>{
   const decoded = verifyRefreshToken(refreshToken)

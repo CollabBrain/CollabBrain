@@ -1320,7 +1320,7 @@ const GroupWorkspacePage = () => {
       </div>
 
       {/* ——— Tab Content / Lock screen ——— */}
-      <div className="max-w-[1100px] mx-auto px-5 md:px-8 py-6">
+      <div className={`max-w-[1100px] mx-auto px-5 md:px-8 ${activeTab === 'chat' ? 'py-4 h-[85vh] min-h-[700px]' : 'py-6'}`}>
         {(!isMember && group.visibility === 'PRIVATE') ? (
           <div className="bg-white rounded-2xl border border-slate-100 p-12 text-center max-w-xl mx-auto shadow-sm space-y-4">
             <div className="w-16 h-16 rounded-2xl bg-indigo-50 flex items-center justify-center mx-auto text-indigo-500">

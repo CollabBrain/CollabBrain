@@ -8,6 +8,8 @@ export const userPublicSelect = {
   avatarUrl: true,
   coverUrl: true,
   bio: true,
+  status: true,
+  statusExpiresAt: true,
   isActive: true,
   isDeleted: true,
   createdAt: true,

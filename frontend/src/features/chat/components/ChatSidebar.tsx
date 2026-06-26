@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, MessageSquare, Loader2, Sparkles } from 'lucide-react';
+import { Search, Plus, MessageSquare, Loader2, Sparkles, Video, Phone, PhoneOff, PhoneMissed } from 'lucide-react';
 import { useChatStore } from '../../../store/useChatStore';
 import { cn } from '../../../lib/utils';
 import type { Conversation, ChatUser } from '../../../types/chat.types';
@@ -65,6 +65,40 @@ const ConvAvatar = ({ user, isOnline }: { user: ChatUser; isOnline: boolean }) =
   );
 };
 
+const renderMessagePreview = (msg: any) => {
+  if (msg.type === 'image' || msg.type === 'IMAGE') return '[Hình ảnh]';
+  if (msg.type === 'file' || msg.type === 'FILE') return '[Tài liệu đính kèm]';
+  
+  const callMatch = typeof msg.content === 'string' 
+    ? msg.content.match(/^\[CALL:(audio|video):(missed|rejected|ended)(?::(\d+))?\]$/)
+    : null;
+    
+  if (callMatch) {
+    const [, type, status] = callMatch;
+    const isVideo = type === 'video';
+    
+    let Icon = isVideo ? Video : Phone;
+    let text = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+    
+    if (status === 'missed') {
+      Icon = PhoneMissed;
+      text = isVideo ? 'Cuộc gọi video nhỡ' : 'Cuộc gọi thoại nhỡ';
+    } else if (status === 'rejected') {
+      Icon = PhoneOff;
+      text = isVideo ? 'Từ chối cuộc gọi video' : 'Từ chối cuộc gọi thoại';
+    }
+
+    return (
+      <span className="flex items-center gap-1">
+        <Icon className={cn("w-3.5 h-3.5", status === 'missed' ? "text-rose-500" : "")} />
+        <span className={cn(status === 'missed' ? "text-rose-500" : "")}>{text}</span>
+      </span>
+    );
+  }
+  
+  return msg.content;
+};
+
 // ——— Conversation Item ———
 const ConversationItem = ({
   conv,
@@ -117,7 +151,7 @@ const ConversationItem = ({
             <span className="text-xs text-primary italic animate-pulse">Đang nhập...</span>
           ) : (
             <p className="text-xs text-muted-foreground truncate">
-              {lastMsg ? lastMsg.content : <span className="italic">Bắt đầu trò chuyện</span>}
+              {lastMsg ? renderMessagePreview(lastMsg) : <span className="italic">Bắt đầu trò chuyện</span>}
             </p>
           )}
           {conv.unreadCount > 0 && (

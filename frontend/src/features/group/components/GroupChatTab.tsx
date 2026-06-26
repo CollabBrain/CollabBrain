@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from 'react';
 import {
   Send, Paperclip, Pin, CornerUpLeft, MoreVertical, X, RotateCcw, Trash2,
   ChevronDown, ChevronUp, FileText, Image as ImageIcon, File as FileIcon,
@@ -8,6 +8,7 @@ import { useGroupChat } from '../../../hooks/useGroupChat';
 import type { GroupMessage, MentionedUser } from '../../../types/chat.types';
 import type { MemberData } from '../services/group.service';
 import { formatFileSize } from '../services/groupChat.service';
+import { EmojiButton } from '../../../components/common/EmojiPicker';
 
 // ——— Types ———
 interface GroupChatTabProps {
@@ -378,23 +379,71 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
   const [mentionQuery, setMentionQuery] = useState<string | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const prevScrollHeightRef = useRef(0);
+  const isInitialLoadRef = useRef(true);
 
-  // ——— Auto scroll to bottom ———
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
+  }, []);
+
+  // Scroll to bottom khi có tin mới (chỉ nếu đang gần cuối)
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages.length]);
+    const container = messagesContainerRef.current;
+    if (!container || messages.length === 0) return;
+    
+    // Nếu là lần đầu load trang -> luôn scroll xuống đáy
+    if (isInitialLoadRef.current) {
+      scrollToBottom('instant');
+      // Set timeout nhỏ để đảm bảo render DOM xong trước khi đánh dấu là đã load
+      setTimeout(() => {
+        isInitialLoadRef.current = false;
+      }, 100);
+      return;
+    }
+
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 300;
+    if (isNearBottom) scrollToBottom();
+  }, [messages.length, scrollToBottom]);
+
+  // Giữ scroll position khi prepend (load thêm trang cũ)
+  useLayoutEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container || isLoading) return;
+    const delta = container.scrollHeight - prevScrollHeightRef.current;
+    // Chỉ cộng delta nếu đang có tin nhắn (không phải load trang đầu tiên) và delta lớn hơn 0
+    if (delta > 0 && prevScrollHeightRef.current > 0) {
+      container.scrollTop += delta;
+      // Reset after adjusting so we don't apply it again until next load more
+      prevScrollHeightRef.current = container.scrollHeight;
+    }
+  }, [messages.length, isLoading]);
 
   // ——— Infinite scroll (load more) ———
+  const handleLoadMoreClick = useCallback(() => {
+    if (messagesContainerRef.current) {
+      prevScrollHeightRef.current = messagesContainerRef.current.scrollHeight;
+    }
+    loadMoreMessages();
+  }, [loadMoreMessages]);
+
   const handleScroll = useCallback(() => {
     const container = messagesContainerRef.current;
-    if (!container || !hasMore || isLoading) return;
+    if (!container) return;
+
+    // Hiển thị nút scroll to bottom nếu chưa cuộn tới đáy
+    const isNearBottom = container.scrollHeight - container.scrollTop - container.clientHeight < 150;
+    setShowScrollBtn(!isNearBottom);
+
+    if (!hasMore || isLoading) return;
     if (container.scrollTop < 100) {
+      prevScrollHeightRef.current = container.scrollHeight;
       loadMoreMessages();
     }
   }, [hasMore, isLoading, loadMoreMessages]);
@@ -475,6 +524,24 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
     e.target.value = '';
   };
 
+  // ——— Emoji insert ———
+  const handleEmojiSelect = useCallback((emoji: string) => {
+    const ta = inputRef.current;
+    if (!ta) {
+      setInputValue(prev => prev + emoji);
+      return;
+    }
+    const start = ta.selectionStart ?? ta.value.length;
+    const end = ta.selectionEnd ?? ta.value.length;
+    const newValue = ta.value.slice(0, start) + emoji + ta.value.slice(end);
+    setInputValue(newValue);
+    requestAnimationFrame(() => {
+      ta.selectionStart = start + emoji.length;
+      ta.selectionEnd = start + emoji.length;
+      ta.focus();
+    });
+  }, []);
+
   // ——— Mention dropdown members ———
   const filteredMembers = mentionQuery !== null
     ? members
@@ -484,7 +551,7 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
     : [];
 
   return (
-    <div className="flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-slate-200">
+    <div className="flex flex-col h-full bg-white rounded-2xl overflow-hidden border border-slate-200 relative">
 
       {/* Pinned bar */}
       <PinnedMessagesBar
@@ -507,7 +574,7 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
 
         {hasMore && messages.length > 0 && (
           <div className="text-center py-2">
-            <button onClick={loadMoreMessages} disabled={isLoading} className="text-xs text-indigo-500 hover:underline border-0 bg-transparent cursor-pointer">
+            <button onClick={handleLoadMoreClick} disabled={isLoading} className="text-xs text-indigo-500 hover:underline border-0 bg-transparent cursor-pointer">
               {isLoading ? <Loader2 className="w-4 h-4 animate-spin inline" /> : 'Tải tin nhắn cũ hơn'}
             </button>
           </div>
@@ -539,6 +606,17 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
 
         <div ref={messagesEndRef} />
       </div>
+
+      {/* Scroll to bottom button */}
+      {showScrollBtn && (
+        <button
+          onClick={() => scrollToBottom()}
+          className="absolute bottom-24 right-8 h-9 w-9 rounded-full bg-indigo-600 border border-indigo-700 shadow-md flex items-center justify-center hover:bg-indigo-700 text-white transition-all hover:scale-105 z-10 cursor-pointer"
+          title="Cuộn xuống dưới"
+        >
+          <ChevronDown className="w-5 h-5" />
+        </button>
+      )}
 
       {/* Typing indicator */}
       <TypingIndicator userNames={typingUserNames} />
@@ -603,6 +681,11 @@ const GroupChatTab = ({ groupId, groupName, myUserId, myRole, members }: GroupCh
               accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,image/*"
               onChange={handleFileChange}
             />
+
+            {/* Emoji Button */}
+            <div className="relative mb-1">
+              <EmojiButton onEmojiSelect={handleEmojiSelect} />
+            </div>
 
             {/* Text input */}
             <div className="flex-1 relative bg-[#F0F2F5] rounded-[20px] flex items-end">
