@@ -19,6 +19,7 @@ const LandingPage = lazy(() => import('../pages/LandingPage'));
 const DocumentsPage = lazy(() => import('../pages/DocumentsPage'));
 const GroupsPage = lazy(() => import('../pages/GroupsPage'));
 const GroupWorkspacePage = lazy(() => import('../pages/GroupWorkspacePage'));
+const TodoListPage = lazy(() => import('../pages/TodoListPage'));
 
 // Lazy load friend pages (from feature/friend-ui)
 const FriendsPage = lazy(() => import('../pages/FriendsPage'));
@@ -37,6 +38,7 @@ const AdminStatsPage = lazy(() => import('../pages/admin/AdminStatsPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminGroupsPage = lazy(() => import('../pages/admin/AdminGroupsPage'));
 const AdminReportsPage = lazy(() => import('../pages/admin/AdminReportsPage'));
+const AdminSettingsPage = lazy(() => import('../pages/admin/AdminSettingsPage'));
 
 // Spinner toàn màn hình khi đang lazy-load hoặc đợi hydration
 const PageSpinner = () => (
@@ -119,7 +121,8 @@ export const AppRouter = () => {
           <Route path={ROUTES.CHAT} element={<ChatPage />} />
           <Route path={ROUTES.DOCUMENTS} element={<DocumentsPage />} />
           <Route path={ROUTES.GROUPS} element={<GroupsPage />} />
-          <Route path="/groups/:groupId" element={<GroupWorkspacePage />} />
+           <Route path="/groups/:groupId" element={<GroupWorkspacePage />} />
+          <Route path="/todolist" element={<TodoListPage />} />
 
           {/* ——— Friend routes (from feature/friend-ui) */}
           <Route path="/friends" element={<FriendsPage />} />
@@ -157,6 +160,7 @@ export const AppRouter = () => {
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/groups" element={<AdminGroupsPage />} />
           <Route path="/admin/reports" element={<AdminReportsPage />} />
+          <Route path="/admin/settings" element={<AdminSettingsPage />} />
         </Route>
 
         {/* ——— Public Landing Page */}

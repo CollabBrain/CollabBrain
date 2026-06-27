@@ -38,6 +38,7 @@ interface ChatState {
 
   setTyping: (conversationId: string, userId: string, isTyping: boolean) => void;
   setOnlineStatus: (userId: string, isOnline: boolean) => void;
+  setMultipleOnlineStatus: (userIds: string[], isOnline: boolean) => void;
 
   setHasMore: (conversationId: string, hasMore: boolean) => void;
   incrementPage: (conversationId: string) => void;
@@ -175,6 +176,15 @@ export const useChatStore = create<ChatState>((set, get) => ({
     set((state) => ({
       onlineUsers: { ...state.onlineUsers, [userId]: isOnline },
     })),
+
+  setMultipleOnlineStatus: (userIds, isOnline) =>
+    set(() => {
+      const updates: Record<string, boolean> = {};
+      userIds.forEach(id => { updates[id] = isOnline; });
+      // Thay thế toàn bộ map để clear các user đã offline khi reconnect
+      return { onlineUsers: updates };
+    }),
+
 
   setHasMore: (conversationId, hasMore) =>
     set((state) => ({

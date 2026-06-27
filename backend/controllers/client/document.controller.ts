@@ -23,7 +23,8 @@ export const uploadPersonalDocumentPost = async (req: Request, res: Response) =>
       });
     }
     file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
-    const result = await uploadPersonalDocumentService(file, userId);
+    const conversationId = req.body.conversationId || req.query.conversationId as string | undefined;
+    const result = await uploadPersonalDocumentService(file, userId, conversationId);
     res.status(200).json({
       code: 200,
       message: result.message,

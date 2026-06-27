@@ -76,10 +76,14 @@ export const getGroupDocumentsApi = (
 /** POST /documents/upload — Upload tài liệu cá nhân */
 export const uploadPersonalDocumentApi = (
   file: File,
-  onProgress?: (percent: number) => void
+  onProgress?: (percent: number) => void,
+  conversationId?: string
 ) => {
   const formData = new FormData();
   formData.append('file', file);
+  if (conversationId) {
+    formData.append('conversationId', conversationId);
+  }
   return axiosInstance.post<ApiResponse<DocumentData>>(
     '/documents/upload',
     formData,

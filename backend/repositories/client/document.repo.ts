@@ -11,6 +11,7 @@ export interface CreateDocumentData {
   size?: number;
   mimeType?: string;
   groupId?: string;
+  conversationId?: string;
   uploadedBy: string;
 }
 
@@ -46,6 +47,7 @@ export const createDocument = async (data: CreateDocumentData) => {
       size: data.size,
       mimeType: data.mimeType,
       groupId: data.groupId || null,
+      conversationId: data.conversationId || null,
       uploadedBy: data.uploadedBy,
     },
     include: {

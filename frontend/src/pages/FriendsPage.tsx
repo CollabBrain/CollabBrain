@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, Plus, RotateCw, UserPlus, MessageCircle, ChevronDown, Loader2 } from 'lucide-react';
+import { Search, Plus, RotateCw, UserPlus, MessageCircle, ChevronDown, Loader2, UserMinus, UserCheck, RefreshCw } from 'lucide-react';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import {
   useFriends,
@@ -8,8 +8,10 @@ import {
   useAcceptRequest,
   useRejectRequest,
   useSendRequest,
+  useSearchStrangers,
+  useUnrequest,
 } from '../hooks/useFriends';
-import type { FriendUser, FriendRequestItem, FriendSuggestionItem } from '../hooks/useFriends';
+import type { FriendUser, FriendRequestItem, FriendSuggestionItem, SearchStrangerItem } from '../hooks/useFriends';
 import { useNavigate } from 'react-router-dom';
 import { useCreateConversation } from '../features/chat/hooks/useChat';
 
@@ -27,6 +29,7 @@ import { useCreateConversation } from '../features/chat/hooks/useChat';
 export const FriendsPage = () => {
   const { data: profile } = useProfile();
   const [searchQuery, setSearchQuery] = useState('');
+  const [strangerSearchQuery, setStrangerSearchQuery] = useState('');
   const [selectedFriend, setSelectedFriend] = useState<string>('');
   const navigate = useNavigate();
   const createConversationMutation = useCreateConversation();
@@ -44,11 +47,13 @@ export const FriendsPage = () => {
   const { data: friends = [], isLoading: loadingFriends } = useFriends();
   const { data: receivedRequests = [], isLoading: loadingRequests } = useFriendRequests('received');
   const { data: suggestions = [], isLoading: loadingSuggestions } = useFriendSuggestions();
+  const { data: strangerResults = [], isLoading: loadingStrangers } = useSearchStrangers(strangerSearchQuery);
 
   // ——— Mutations ———
   const acceptMutation = useAcceptRequest();
   const rejectMutation = useRejectRequest();
   const sendRequestMutation = useSendRequest();
+  const unrequestMutation = useUnrequest();
 
   // ——— Handlers ———
   const handleAcceptRequest = (senderId: string) => {
@@ -61,6 +66,10 @@ export const FriendsPage = () => {
 
   const handleSendRequest = (userId: string) => {
     sendRequestMutation.mutate(userId);
+  };
+
+  const handleUnrequest = (userId: string) => {
+    unrequestMutation.mutate(userId);
   };
 
   // Filter bạn bè theo search
@@ -168,6 +177,119 @@ export const FriendsPage = () => {
               Kết nối và cùng nhau tiến bộ trong học tập.
             </p>
           </div>
+        </div>
+
+        {/* ——— Card Tìm kiếm người dùng mới ——— */}
+        <div className="bg-white border border-slate-100 rounded-3xl p-5 shadow-[0_4px_24px_rgba(99,102,241,0.01)] text-left space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-50">
+            <span className="text-sm font-black text-slate-700">Tìm kiếm người dùng mới</span>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Nhập tên hoặc email để tìm kiếm người lạ..."
+              value={strangerSearchQuery}
+              onChange={(e) => setStrangerSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2.5 text-xs bg-slate-50 border border-slate-200/10 focus:bg-white rounded-xl focus:outline-none focus:ring-1 focus:ring-indigo-600/20 transition-all font-semibold placeholder:text-slate-400"
+            />
+          </div>
+
+          {/* Kết quả tìm kiếm */}
+          {strangerSearchQuery.trim().length >= 2 && (
+            <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+              {loadingStrangers ? (
+                <div className="flex items-center justify-center py-6">
+                  <Loader2 className="w-5 h-5 animate-spin text-slate-400" />
+                </div>
+              ) : strangerResults.length === 0 ? (
+                <p className="text-xs text-slate-400 font-bold py-6 text-center">Không tìm thấy người dùng nào</p>
+              ) : (
+                strangerResults.map((sug: SearchStrangerItem) => {
+                  const isSent = sug.friendship?.status === 'PENDING' && sug.friendship.senderId === profile?.id;
+                  const isReceived = sug.friendship?.status === 'PENDING' && sug.friendship.receiverId === profile?.id;
+                  const isAccepted = sug.friendship?.status === 'ACCEPTED';
+                  const isBlocked = sug.friendship?.status === 'BLOCKED';
+
+                  return (
+                    <div key={sug.id} className="flex items-center justify-between gap-3 p-2 rounded-2xl hover:bg-slate-50/50 transition-all border border-slate-100">
+                      <div className="flex items-center gap-3 min-w-0">
+                        {sug.avatarUrl ? (
+                          <img
+                            src={sug.avatarUrl}
+                            alt={sug.name}
+                            className="w-10 h-10 rounded-full object-cover shrink-0 border border-slate-100"
+                          />
+                        ) : (
+                          <div className="w-10 h-10 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white font-bold text-xs shrink-0">
+                            {sug.name.split(' ').map(w => w[0]).join('').slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0">
+                          <p className="text-xs font-extrabold text-slate-700 truncate">{sug.name}</p>
+                          <p className="text-[10px] text-slate-400 font-semibold truncate mt-0.5">{sug.email}</p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {isAccepted ? (
+                          <>
+                            <span className="px-2 py-1 text-[9px] font-extrabold text-emerald-600 bg-emerald-50 rounded-lg flex items-center gap-1 border border-emerald-100 select-none">
+                              <UserCheck className="w-3 h-3" /> Bạn bè
+                            </span>
+                            <button
+                              onClick={() => handleStartChat(sug.id)}
+                              className="px-2.5 py-1 text-[9px] font-extrabold text-indigo-600 hover:text-white hover:bg-indigo-600 border border-indigo-100 hover:border-indigo-600 rounded-lg transition-all cursor-pointer bg-transparent"
+                            >
+                              Nhắn tin
+                            </button>
+                          </>
+                        ) : isBlocked ? (
+                          <span className="px-2 py-1 text-[9px] font-extrabold text-slate-400 bg-slate-50 rounded-lg border border-slate-200 select-none">
+                            Đã chặn
+                          </span>
+                        ) : isSent ? (
+                          <button
+                            onClick={() => handleUnrequest(sug.id)}
+                            disabled={unrequestMutation.isPending}
+                            className="px-3 py-1.5 text-[10px] font-extrabold text-slate-500 bg-slate-100 hover:bg-rose-50 hover:text-rose-600 hover:border-rose-200 border border-slate-200 rounded-lg transition-all outline-none cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                            title="Hủy lời mời kết bạn"
+                          >
+                            <UserMinus className="w-3.5 h-3.5" /> Hủy yêu cầu
+                          </button>
+                        ) : isReceived ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleAcceptRequest(sug.id)}
+                              disabled={acceptMutation.isPending}
+                              className="px-2.5 py-1.5 text-[10px] font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all border-0 outline-none cursor-pointer disabled:opacity-50"
+                            >
+                              Đồng ý
+                            </button>
+                            <button
+                              onClick={() => handleRejectRequest(sug.id)}
+                              disabled={rejectMutation.isPending}
+                              className="px-2.5 py-1.5 text-[10px] font-extrabold text-slate-500 bg-slate-100 hover:bg-slate-200 rounded-lg transition-all border-0 outline-none cursor-pointer disabled:opacity-50"
+                            >
+                              Từ chối
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => handleSendRequest(sug.id)}
+                            disabled={sendRequestMutation.isPending}
+                            className="px-3 py-1.5 text-[10px] font-extrabold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-all border-0 outline-none cursor-pointer disabled:opacity-50 flex items-center gap-1"
+                          >
+                            <UserPlus className="w-3.5 h-3.5" /> Kết bạn
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
 
         {/* Hàng chia đôi: Lời mời kết bạn & Gợi ý kết bạn */}

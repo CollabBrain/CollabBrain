@@ -13,8 +13,9 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts: true, // Cho phép các host từ Ngrok
     proxy: {
-      // Proxy API calls đến backend để tránh CORS khi dev
+      // Proxy API calls đến backend để tránh CORS khi dev (nếu cần)
       '/api': {
         target: 'http://localhost:3000',
         changeOrigin: true,

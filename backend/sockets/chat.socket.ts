@@ -1,9 +1,31 @@
 import { Server, Socket } from "socket.io"
-import { createMessage, findMessageById } from "../repositories/client/chat.repo"
+import { createMessage, findMessageById, createGroupMessage } from "../repositories/client/chat.repo"
 import prisma from "../config/prisma"
+import { queryRAGService } from "../services/client/rag.service"
+
+const ensureAIBotUser = async () => {
+  try {
+    await prisma.user.upsert({
+      where: { id: "ai-assistant-bot-uuid" },
+      update: {},
+      create: {
+        id: "ai-assistant-bot-uuid",
+        name: "AI Assistant",
+        email: "ai.assistant@collabbrain.com",
+        passwordHash: "$2b$10$abcdefghijklmnopqrstuvwxyz0123456789",
+        avatarUrl: null,
+        isActive: true,
+      }
+    });
+  } catch (error) {
+    console.error("[Socket] Lỗi khởi tạo AI Bot User:", error);
+  }
+};
 
 export const chatSocket = (io: Server) => {
   const onlineUsers = new Map<string, string>()
+
+  ensureAIBotUser();
 
   io.on("connection", async (socket: Socket) => {
     const user = socket.data.user
@@ -23,39 +45,190 @@ export const chatSocket = (io: Server) => {
       console.error("[Socket] Lỗi join group rooms:", e)
     }
 
+    // Gửi danh sách online hiện tại CHỈ cho user vừa connect (không broadcast)
+    socket.emit("user:initial_online", { onlineUserIds: Array.from(onlineUsers.keys()) })
+
+    // Thông báo user online cho tất cả (ngoại trừ bản thân)
     socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: true })
 
     // ——— CHAT 1-1 ———
     socket.on("chat:send_message", async (data) => {
       try {
-        const { conversationId, content, type = "text" } = data
-        const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any)
+        const { conversationId, content, type = "text", replyToId } = data
+        const savedMessage = await createMessage(user.id, conversationId, content, type.toUpperCase() as any, replyToId)
 
-        const formattedMessage = {
-          ...savedMessage,
-          conversationId,
-          type: savedMessage.type.toLowerCase()
-        }
-
-        io.to(conversationId).emit("chat:new_message", { message: formattedMessage })
-        socket.emit("chat:new_message", { message: formattedMessage })
+        // Broadcast cho người nhận
+        io.to(conversationId).emit("chat:new_message", { 
+          message: { 
+            ...savedMessage, 
+            conversationId: user.id,
+            type: savedMessage.type.toLowerCase() 
+          } 
+        })
+        
+        // Gửi lại cho người gửi (để tất cả các tab của người gửi đều update)
+        io.to(user.id).emit("chat:new_message", { 
+          message: { 
+            ...savedMessage, 
+            conversationId: conversationId, 
+            type: savedMessage.type.toLowerCase() 
+          } 
+        })
       } catch (error: any) {
         socket.emit("chat:error", { message: error.message })
       }
     })
 
     socket.on("chat:typing", ({ conversationId, isTyping }: { conversationId: string; isTyping: boolean }) => {
-      io.to(conversationId).emit("chat:typing", {
-        conversationId,
+      socket.to(conversationId).emit("chat:typing", {
+        conversationId: user.id,
         userId: user.id,
         isTyping
       })
     })
 
-    // ——— GROUP CHAT (basic) ———
+    // ================================================================
+    // ——— WEBRTC SIGNALING (CHAT 1-1) ———
+    // ================================================================
+
+    /**
+     * BƯỚC 1: Caller yêu cầu gọi tới Callee
+     */
+    socket.on("call:request", ({ targetUserId, callType, callerInfo }: {
+      targetUserId: string,
+      callType: 'audio' | 'video',
+      callerInfo: { name: string, avatarUrl?: string }
+    }) => {
+      if (!onlineUsers.has(targetUserId)) {
+        socket.emit("call:error", { code: "USER_OFFLINE", message: "Người dùng không online" })
+        return
+      }
+
+      console.log(`[Call] ${user.id} → ${targetUserId} [${callType}]`)
+
+      io.to(targetUserId).emit("call:incoming", {
+        callerId: user.id,
+        callType,
+        callerInfo: {
+          name: callerInfo.name || "Người dùng",
+          avatarUrl: callerInfo.avatarUrl || null
+        }
+      })
+    })
+
+    /**
+     * BƯỚC 2A: Callee đồng ý cuộc gọi
+     */
+    socket.on("call:accept", ({ callerId }: { callerId: string }) => {
+      console.log(`[Call] ${user.id} accepted call from ${callerId}`)
+      io.to(callerId).emit("call:accepted", { calleeId: user.id })
+    })
+
+    /**
+     * BƯỚC 2B: Callee từ chối cuộc gọi
+     */
+    socket.on("call:reject", ({ callerId, reason }: { callerId: string, reason?: string }) => {
+      console.log(`[Call] ${user.id} rejected call from ${callerId}`)
+      io.to(callerId).emit("call:rejected", {
+        calleeId: user.id,
+        reason: reason || "declined"
+      })
+    })
+
+    /**
+     * BƯỚC 3: Caller gửi WebRTC Offer SDP
+     */
+    socket.on("call:offer", ({ targetUserId, offer }: {
+      targetUserId: string,
+      offer: RTCSessionDescriptionInit
+    }) => {
+      io.to(targetUserId).emit("call:offer", {
+        callerId: user.id,
+        offer
+      })
+    })
+
+    /**
+     * BƯỚC 4: Callee gửi WebRTC Answer SDP
+     */
+    socket.on("call:answer", ({ targetUserId, answer }: {
+      targetUserId: string,
+      answer: RTCSessionDescriptionInit
+    }) => {
+      io.to(targetUserId).emit("call:answer", {
+        calleeId: user.id,
+        answer
+      })
+    })
+
+    /**
+     * BƯỚC 5: ICE Candidate
+     */
+    socket.on("call:ice-candidate", ({ targetUserId, candidate }: {
+      targetUserId: string,
+      candidate: RTCIceCandidateInit
+    }) => {
+      io.to(targetUserId).emit("call:ice-candidate", {
+        senderId: user.id,
+        candidate
+      })
+    })
+
+    /**
+     * Kết thúc cuộc gọi
+     */
+    socket.on("call:end", ({ targetUserId }: { targetUserId: string }) => {
+      console.log(`[Call] ${user.id} ended call with ${targetUserId}`)
+      io.to(targetUserId).emit("call:ended", { byUserId: user.id })
+    })
+
+    /**
+     * Ghi nhận lịch sử cuộc gọi
+     */
+    socket.on("call:log", async ({ targetUserId, callType, status, duration }: { targetUserId: string, callType: string, status: string, duration?: string }) => {
+      try {
+        const content = `[CALL:${callType}:${status}${duration ? `:${duration}` : ''}]`
+        const savedMessage = await createMessage(user.id, targetUserId, content, "TEXT")
+
+        io.to(targetUserId).emit("chat:new_message", { 
+          message: { 
+            ...savedMessage, 
+            conversationId: user.id, 
+            type: "text" 
+          } 
+        })
+        
+        io.to(user.id).emit("chat:new_message", { 
+          message: { 
+            ...savedMessage, 
+            conversationId: targetUserId, 
+            type: "text" 
+          } 
+        })
+      } catch (e) {
+        console.error("[Socket] call:log error:", e)
+      }
+    })
+
+    // ================================================================
+    // ——— GROUP CHAT ———
+    // ================================================================
+
+    socket.on("group:join", ({ groupId }: { groupId: string }) => {
+      if (groupId) {
+        socket.join(`group:${groupId}`)
+      }
+    })
+
+    socket.on("group:leave", ({ groupId }: { groupId: string }) => {
+      if (groupId) {
+        socket.leave(`group:${groupId}`)
+      }
+    })
+
     socket.on("group:send_message", async (data) => {
       try {
-        const { groupId, content, type = "text" } = data
+        const { groupId, content, type = "text", replyToId, mentionIds } = data
         if (!groupId || !content) return
 
         const member = await prisma.groupMember.findUnique({
@@ -70,22 +243,96 @@ export const chatSocket = (io: Server) => {
           return
         }
 
-        const savedMessage = await prisma.message.create({
-          data: {
-            senderId: user.id,
-            groupId,
-            content,
-            type: type.toUpperCase() as any
-          },
-          include: {
-            sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
-          }
-        })
+        // Loại bỏ ID trùng lặp trong mentionIds
+        const uniqueMentionIds = mentionIds && mentionIds.length > 0
+          ? Array.from(new Set(mentionIds)) as string[]
+          : undefined;
+
+        const savedMessage = await createGroupMessage(
+          user.id,
+          groupId,
+          content,
+          type.toUpperCase() as any,
+          replyToId,
+          uniqueMentionIds
+        )
 
         io.to(`group:${groupId}`).emit("group:new_message", {
           groupId,
           message: savedMessage
         })
+
+        // Xử lý AI Assistant nếu được mention
+        const AI_BOT_ID = "ai-assistant-bot-uuid";
+        const hasBotMention = (mentionIds && mentionIds.includes(AI_BOT_ID)) ||
+          (content && (content.includes("@AI Assistant") || content.includes("@AI")));
+
+        if (hasBotMention) {
+          io.to(`group:${groupId}`).emit("group:typing", {
+            groupId,
+            userId: AI_BOT_ID,
+            userName: "AI Assistant",
+            isTyping: true
+          });
+
+          (async () => {
+            try {
+              await ensureAIBotUser();
+
+              let question = content.replace(/@AI Assistant/g, "").replace(/@AI/g, "").trim();
+              if (!question) {
+                question = "Xin chào! Bạn cần tôi giúp gì về tài liệu của nhóm?";
+              }
+
+              const result = await queryRAGService(user.id, question, { groupId });
+
+              let botResponseContent = result.answer;
+              if (result.sources && result.sources.length > 0) {
+                const uniqueSources = Array.from(new Set(result.sources.map(s => s.documentName)));
+                botResponseContent += "\n\n📎 Nguồn tài liệu tham khảo:\n" + uniqueSources.map(name => `- ${name}`).join("\n");
+              }
+
+              const botMessage = await createGroupMessage(
+                AI_BOT_ID,
+                groupId,
+                botResponseContent,
+                "TEXT"
+              );
+
+              io.to(`group:${groupId}`).emit("group:typing", {
+                groupId,
+                userId: AI_BOT_ID,
+                userName: "AI Assistant",
+                isTyping: false
+              });
+
+              io.to(`group:${groupId}`).emit("group:new_message", {
+                groupId,
+                message: botMessage
+              });
+
+            } catch (err: any) {
+              console.error("[Socket RAG Bot Error]", err);
+              io.to(`group:${groupId}`).emit("group:typing", {
+                groupId,
+                userId: AI_BOT_ID,
+                userName: "AI Assistant",
+                isTyping: false
+              });
+
+              const botErrorMessage = await createGroupMessage(
+                AI_BOT_ID,
+                groupId,
+                "Xin lỗi, đã xảy ra lỗi trong quá trình xử lý câu hỏi của bạn. Vui lòng thử lại sau.",
+                "TEXT"
+              );
+              io.to(`group:${groupId}`).emit("group:new_message", {
+                groupId,
+                message: botErrorMessage
+              });
+            }
+          })();
+        }
       } catch (error: any) {
         console.error("[Socket group:send_message]", error.message)
         socket.emit("group:error", { message: error.message })
