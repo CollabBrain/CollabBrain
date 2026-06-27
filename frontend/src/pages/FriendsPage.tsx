@@ -89,9 +89,9 @@ export const FriendsPage = () => {
     unblockMutation.mutate(userId);
   };
 
-  // Filter bạn bè theo search
+  // Filter bạn bè theo search (đã trim khoảng trắng)
   const filteredFriends = friends.filter((f: FriendUser) =>
-    f.name.toLowerCase().includes(searchQuery.toLowerCase())
+    f.name.toLowerCase().includes(searchQuery.trim().toLowerCase())
   );
 
   // Quick friends = top 5 cho sidebar trái
@@ -129,7 +129,7 @@ export const FriendsPage = () => {
             </div>
           ) : quickFriends.length === 0 ? (
             <p className="text-xs text-slate-400 font-semibold text-center py-6">
-              {searchQuery ? 'Không tìm thấy bạn bè' : 'Chưa có bạn bè nào'}
+              {searchQuery.trim() ? 'Không tìm thấy bạn bè' : 'Chưa có bạn bè nào'}
             </p>
           ) : (
             quickFriends.map((friend: FriendUser) => (

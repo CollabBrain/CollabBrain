@@ -93,8 +93,15 @@ const ReplyBar = ({ message, onCancel }: { message: GroupMessage; onCancel: () =
     <CornerUpLeft className="w-4 h-4 text-indigo-400 shrink-0" />
     <div className="flex-1 min-w-0">
       <p className="text-xs font-bold text-indigo-600">{message.sender?.name}</p>
-      <p className="text-xs text-slate-500 truncate">
-        {message.isRecalled ? '🚫 Tin nhắn đã được thu hồi' : message.content}
+      <p className="text-xs text-slate-500 truncate flex items-center gap-1">
+        {message.isRecalled ? (
+          <>
+            <Ban className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+            <span>Tin nhắn đã được thu hồi</span>
+          </>
+        ) : (
+          message.content
+        )}
       </p>
     </div>
     <button onClick={onCancel} className="p-1 text-slate-400 hover:text-slate-600 border-0 bg-transparent cursor-pointer rounded">
@@ -103,12 +110,36 @@ const ReplyBar = ({ message, onCancel }: { message: GroupMessage; onCancel: () =
   </div>
 );
 
+const linkifyText = (text: string, isMe?: boolean) => {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={`underline break-all ${
+            isMe ? 'text-white hover:text-white/90' : 'text-blue-600 hover:text-blue-800'
+          }`}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 /** Mention highlight trong nội dung tin nhắn */
 const renderContent = (content: string, mentions?: GroupMessage['mentions'], isMe?: boolean) => {
   if (!content) return '';
 
-  // Regex tìm các chuỗi bắt đầu bằng @ theo sau là chữ tiếng Việt/Anh, số, khoảng trắng (tối đa 3 từ)
-  const mentionRegex = /@([A-Za-z0-9_À-ỹ]+(?:\s+[A-Za-z0-9_À-ỹ]+){0,2})/g;
+  // Regex ưu tiên tìm các từ khóa @AI Assistant / @AI chính xác trước, sau đó mới tìm các mention thường khác
+  const mentionRegex = /@(AI Assistant\b|AI\b|([A-Za-z0-9_À-ỹ]+(?:\s+[A-Za-z0-9_À-ỹ]+){0,2}))/gi;
 
   const parts: React.ReactNode[] = [];
   let lastIndex = 0;
@@ -120,42 +151,34 @@ const renderContent = (content: string, mentions?: GroupMessage['mentions'], isM
   while ((match = mentionRegex.exec(content)) !== null) {
     const matchIndex = match.index;
     const matchText = match[0];
-    const name = match[1];
 
     // Add text trước mention
     if (matchIndex > lastIndex) {
-      parts.push(<span key={key++}>{content.substring(lastIndex, matchIndex)}</span>);
+      parts.push(<span key={key++}>{linkifyText(content.substring(lastIndex, matchIndex), isMe)}</span>);
     }
 
-    // Kiểm tra nếu là AI Assistant hoặc AI thì hiển thị dạng chữ thường bình thường, không bọc trong pill xanh nổi bật
-    const isAIBot = name.toLowerCase() === 'ai assistant' || name.toLowerCase() === 'ai';
-
-    if (isAIBot) {
-      parts.push(<span key={key++}>{matchText}</span>);
-    } else {
-      // Add mention khác (thành viên thường) được định dạng đậm màu xanh nước biển / trắng tùy người gửi
-      parts.push(
-        <span
-          key={key++}
-          className={`font-bold px-1 py-0.5 rounded-md ${
-            isMe 
-              ? 'text-white bg-white/20' 
-              : 'text-blue-600 bg-blue-50 border border-blue-100 font-bold'
-          }`}
-        >
-          {matchText}
-        </span>
-      );
-    }
+    // Add mention (cả thành viên thường và AI Assistant) được định dạng đậm màu xanh nước biển / trắng tùy người gửi
+    parts.push(
+      <span
+        key={key++}
+        className={`font-bold px-1 py-0.5 rounded-md ${
+          isMe 
+            ? 'text-white bg-white/20' 
+            : 'text-blue-600 bg-blue-50 border border-blue-100 font-bold'
+        }`}
+      >
+        {matchText}
+      </span>
+    );
 
     lastIndex = mentionRegex.lastIndex;
   }
 
   if (lastIndex < content.length) {
-    parts.push(<span key={key++}>{content.substring(lastIndex)}</span>);
+    parts.push(<span key={key++}>{linkifyText(content.substring(lastIndex), isMe)}</span>);
   }
 
-  return parts.length > 0 ? <>{parts}</> : <>{content}</>;
+  return parts.length > 0 ? <>{parts}</> : <>{linkifyText(content, isMe)}</>;
 };
 
 /** Một bong bóng tin nhắn */

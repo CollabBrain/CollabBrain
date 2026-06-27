@@ -2,6 +2,32 @@ import { cn } from '../../../lib/utils';
 import type { Message, ChatUser } from '../../../types/chat.types';
 import { CheckCheck, Check, FileText, Download, Phone, PhoneMissed, Video, PhoneOff } from 'lucide-react';
 
+const renderMessageTextWithLinks = (text: string, isMine: boolean) => {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "underline break-all",
+            isMine ? "text-primary-foreground hover:opacity-90" : "text-blue-600 hover:underline"
+          )}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
+
 interface MessageBubbleProps {
   message: Message;
   isMine: boolean;
@@ -241,7 +267,7 @@ const MessageBubble = ({
               onCallAgain={onCallAgain} 
             />
           ) : (
-            <span>{message.content}</span>
+            <span>{renderMessageTextWithLinks(message.content, isMine)}</span>
           )}
         </div>
 

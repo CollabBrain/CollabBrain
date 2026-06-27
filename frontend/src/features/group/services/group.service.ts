@@ -19,6 +19,7 @@ export interface GroupData {
   memberCount: number;
   createdAt: string;
   updatedAt: string;
+  joinStatus?: 'none' | 'pending' | 'invited' | 'joined';
 }
 
 export interface GroupWithRole extends GroupData {
@@ -145,6 +146,10 @@ export const leaveGroupApi = (groupId: string) =>
 /** POST /groups/:groupId/join-request — Gửi yêu cầu tham gia nhóm */
 export const joinRequestApi = (groupId: string) =>
   axiosInstance.post<ApiResponse<JoinRequestData>>(`/groups/${groupId}/join-request`);
+
+/** DELETE /groups/:groupId/join-request — Hủy yêu cầu tham gia nhóm */
+export const cancelJoinRequestApi = (groupId: string) =>
+  axiosInstance.delete<ApiResponse<null>>(`/groups/${groupId}/join-request`);
 
 /** GET /groups/:groupId/join-requests — Danh sách yêu cầu tham gia (owner only) */
 export const getJoinRequestsApi = (groupId: string) =>
