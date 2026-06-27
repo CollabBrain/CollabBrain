@@ -122,7 +122,7 @@ export const AppRouter = () => {
           <Route path={ROUTES.DOCUMENTS} element={<DocumentsPage />} />
           <Route path={ROUTES.GROUPS} element={<GroupsPage />} />
            <Route path="/groups/:groupId" element={<GroupWorkspacePage />} />
-          <Route path="/todolist" element={<TodoListPage />} />
+          <Route path="/todos" element={<TodoListPage />} />
 
           {/* ——— Friend routes (from feature/friend-ui) */}
           <Route path="/friends" element={<FriendsPage />} />

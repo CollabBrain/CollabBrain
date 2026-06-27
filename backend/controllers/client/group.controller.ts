@@ -2,6 +2,7 @@ import { Request, Response } from "express"
 import { groupTypeData } from "../../types/client/group.types"
 import { acceptInvitationPatchService, acceptMemberPatchService, addMemberPostService, changeRoleUserPatchService, creatGroupPostService, deleteMemberDeleteService, findGroupGetService, groupInfoGetService, inviteMemberPostService, joinRequestPostService, leaveGroupPostService, listInvitationGetService, listRequestGetService, memberGroupGetService, myGroupGetService, rejectInvitationPatchService, rejectMemberPatchService, removeGroupDeleteService, transferOwnerPatchService, updateGroupPatchService } from "../../services/client/group.service"
 import { GroupRole } from "@prisma/client"
+import prisma from "../../config/prisma"
 
 //[POST] /groups
 export const createGroupPost = async (req: Request, res: Response) => {
@@ -228,6 +229,23 @@ export const joinRequestPost = async (req: Request, res: Response) => {
     const groupId: string = req.params.groupId as string
     const myId = (req as any).user.id
     const result = await joinRequestPostService(groupId, myId)
+
+    // Emit socket event to the group owner
+    const io = req.app.get("io")
+    if (io) {
+      const ownerMember = await prisma.groupMember.findFirst({
+        where: { groupId, role: "OWNER" },
+        select: { userId: true }
+      })
+      if (ownerMember) {
+        io.to(ownerMember.userId).emit("new_group_join_request", {
+          message: "Có yêu cầu tham gia nhóm mới",
+          groupId,
+          invitation: result.data
+        })
+      }
+    }
+
     res.status(200).json({
       data: result.data,
       message: result.message,
@@ -301,6 +319,17 @@ export const inviteMemberPost = async (req: Request, res: Response) => {
     const userId = req.body.userId;
     const myId = (req as any).user.id;
     const result = await inviteMemberPostService(groupId, userId, myId)
+
+    // Emit socket event to the invited user
+    const io = req.app.get("io")
+    if (io) {
+      io.to(userId).emit("new_group_invitation", {
+        message: "Bạn có một lời mời vào nhóm mới",
+        groupId,
+        invitation: result.data
+      })
+    }
+
     res.status(200).json({
       data: result.data,
       message: result.message,

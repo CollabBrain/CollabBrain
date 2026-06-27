@@ -8,9 +8,15 @@ import { ROUTES } from '../constants';
 import { cn } from '../lib/utils';
 import { CallOverlay } from '../features/chat/components/CallOverlay';
 import { useCallStore } from '../store/useCallStore';
-import { getSocket } from '../socket/socket';
+import { getSocket, initSocket, disconnectSocket } from '../socket/socket';
 import { useSettings } from '../hooks/useSettings';
 import { NotificationBell } from '../components/NotificationBell';
+import { useChatSocket, useConversations } from '../features/chat/hooks/useChat';
+import { useFriendRequests } from '../hooks/useFriends';
+import { useGroupInvitations } from '../features/group/services/group.service';
+import { useQueryClient } from '@tanstack/react-query';
+import { useGroupChatStore } from '../store/useGroupChatStore';
+import { useNotificationSettings } from '../hooks/useNotificationSettings';
 
 // ——— Nav items config ———
 const NAV_ITEMS = [
@@ -33,6 +39,9 @@ interface SidebarContentProps {
   onNavClick?: () => void;
   onLogout: () => void;
   webName?: string;
+  chatUnreadCount: number;
+  friendRequestsCount: number;
+  groupInvitationsCount: number;
 }
 
 const SidebarContent = memo(({
@@ -43,6 +52,9 @@ const SidebarContent = memo(({
   onNavClick,
   onLogout,
   webName,
+  chatUnreadCount,
+  friendRequestsCount,
+  groupInvitationsCount,
 }: SidebarContentProps) => {
   const isActive = (path: string) => {
     if (path === ROUTES.CHAT) return pathname.startsWith(ROUTES.CHAT);
@@ -67,7 +79,14 @@ const SidebarContent = memo(({
           {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
             const active = isActive(to);
             const isChat = to === ROUTES.CHAT;
-            const totalUnread = useChatStore((s) => s.totalUnreadCount);
+            const isFriends = to === '/friends';
+            const isGroups = to === '/groups';
+
+            let badgeCount = 0;
+            if (isChat) badgeCount = chatUnreadCount;
+            if (isFriends) badgeCount = friendRequestsCount;
+            if (isGroups) badgeCount = groupInvitationsCount;
+
             return (
               <Link
                 key={to}
@@ -82,9 +101,9 @@ const SidebarContent = memo(({
               >
                 <Icon className={cn('h-5 w-5', active ? 'text-indigo-600' : 'text-slate-400')} />
                 {label}
-                {isChat && totalUnread > 0 && (
+                {badgeCount > 0 && (
                   <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
-                    {totalUnread > 99 ? '99+' : totalUnread}
+                    {badgeCount > 99 ? '99+' : badgeCount}
                   </span>
                 )}
                 {active && (
@@ -152,6 +171,8 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { data: profile } = useProfile();
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const queryClient = useQueryClient();
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const { setIncomingCall, status } = useCallStore();
@@ -162,6 +183,94 @@ const MainLayout = () => {
   };
 
   const closeMobile = () => setIsMobileOpen(false);
+
+  // Initialize and clean up socket connection globally
+  useEffect(() => {
+    if (accessToken) {
+      initSocket(accessToken);
+    } else {
+      disconnectSocket();
+    }
+  }, [accessToken]);
+
+  // Setup global chat socket listener
+  useChatSocket();
+  useConversations();
+
+  // Fetch notification settings
+  const { data: notifSettings } = useNotificationSettings();
+  const isNotifEnabled = notifSettings?.enableAll !== false;
+  const isChatEnabled = notifSettings?.enableChat !== false;
+  const isFriendEnabled = notifSettings?.enableFriend !== false;
+  const isGroupEnabled = notifSettings?.enableGroup !== false;
+
+  // Fetch real-time count of friend requests and group invitations
+  const { data: friendRequests = [] } = useFriendRequests('received');
+  const { data: groupInvitations = [] } = useGroupInvitations();
+  const unreadGroupMessagesCount = useGroupChatStore((s) => s.totalUnreadCount);
+  const totalUnread = useChatStore((s) => s.totalUnreadCount);
+
+  // Clear unread count for group when viewing its chat
+  useEffect(() => {
+    const pathMatch = pathname.match(/^\/groups\/([^/]+)/);
+    if (pathMatch) {
+      const activeGroupId = pathMatch[1];
+      useGroupChatStore.getState().clearUnread(activeGroupId);
+    }
+  }, [pathname]);
+
+  // Listen to other real-time notifications via socket
+  useEffect(() => {
+    if (!accessToken) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNewFriendRequest = () => {
+      queryClient.invalidateQueries({ queryKey: ['friend-requests', 'received'] });
+    };
+
+    const handleAcceptFriendRequest = () => {
+      queryClient.invalidateQueries({ queryKey: ['friends'] });
+    };
+
+    const handleNewGroupInvitation = () => {
+      queryClient.invalidateQueries({ queryKey: ['group-invitations'] });
+    };
+
+    const handleNewGroupJoinRequest = () => {
+      queryClient.invalidateQueries({ queryKey: ['group-invitations'] });
+    };
+
+    const handleGroupNewMessage = ({ groupId, message }: { groupId: string; message: any }) => {
+      const pathMatch = window.location.pathname.match(/^\/groups\/([^/]+)/);
+      const activeGroupId = pathMatch ? pathMatch[1] : null;
+
+      let myId = '';
+      try {
+        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        myId = payload.id ?? payload.sub ?? payload.userId ?? '';
+      } catch {}
+
+      const isFromMe = message.senderId === myId;
+      if (groupId !== activeGroupId && !isFromMe) {
+        useGroupChatStore.getState().incrementUnread(groupId);
+      }
+    };
+
+    socket.on('new_request_friend', handleNewFriendRequest);
+    socket.on('accept_friend_request', handleAcceptFriendRequest);
+    socket.on('new_group_invitation', handleNewGroupInvitation);
+    socket.on('new_group_join_request', handleNewGroupJoinRequest);
+    socket.on('group:new_message', handleGroupNewMessage);
+
+    return () => {
+      socket.off('new_request_friend', handleNewFriendRequest);
+      socket.off('accept_friend_request', handleAcceptFriendRequest);
+      socket.off('new_group_invitation', handleNewGroupInvitation);
+      socket.off('new_group_join_request', handleNewGroupJoinRequest);
+      socket.off('group:new_message', handleGroupNewMessage);
+    };
+  }, [accessToken, queryClient]);
 
   // ——— Lắng nghe cuộc gọi đến từ bất kỳ trang nào ———
   useEffect(() => {
@@ -204,6 +313,9 @@ const MainLayout = () => {
     userTier,
     onLogout: handleLogout,
     webName,
+    chatUnreadCount: isNotifEnabled && isChatEnabled ? totalUnread : 0,
+    friendRequestsCount: isNotifEnabled && isFriendEnabled ? friendRequests.length : 0,
+    groupInvitationsCount: isNotifEnabled && isGroupEnabled ? (groupInvitations.length + unreadGroupMessagesCount) : 0,
   };
 
   return (
