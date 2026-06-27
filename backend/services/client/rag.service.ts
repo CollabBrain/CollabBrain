@@ -36,7 +36,7 @@ export const ingestDocumentService = async (documentId: string) => {
       };
     });
     await savedChunks(doc.id, chunkData);
-    
+
     const chunksToEmbed = await prisma.documentChunk.findMany({
       where: { documentId: doc.id, isEmbedded: false }
     });
@@ -44,9 +44,9 @@ export const ingestDocumentService = async (documentId: string) => {
     if (chunksToEmbed.length > 0) {
       const contents = chunksToEmbed.map(c => c.content);
       const vectors = await getBatchEmbeddings(contents, false);
-      
+
       await Promise.all(
-        chunksToEmbed.map((chunk, index) => 
+        chunksToEmbed.map((chunk, index) =>
           updateChunkEmbedding(chunk.id, vectors[index])
         )
       );
@@ -56,7 +56,7 @@ export const ingestDocumentService = async (documentId: string) => {
       where: { id: doc.id },
       data: { isEmbedded: true }
     });
-    console.log(`[RAG Ingestion] Hoàn thành phân tích và tạo chỉ mục RAG cho file ${doc.name} thành công.`);
+    console.log(`\n[RAG Ingestion SUCCESS] Đã tạo embedding và cập nhật database thành công cho file: "${doc.name}" (ID: ${doc.id}) với ${chunksToEmbed.length} chunks.\n`);
   } catch (err: any) {
     console.error(`[RAG Ingestion] Lỗi xử lý tài liệu ${documentId}:`, err.message);
     try {
@@ -79,7 +79,7 @@ export const queryRAGService = async (userId: string, question: string, options:
     conversationId: options.conversationId,
     textQuery: question
   })
-  
+
   if (matchChunks.length === 0) {
     return {
       answer: "Không tìm thấy nội dung liên quan trong cơ sở dữ liệu tài liệu mà bạn có quyền truy cập.",

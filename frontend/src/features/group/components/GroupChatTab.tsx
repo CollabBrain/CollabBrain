@@ -387,7 +387,9 @@ const PinnedMessagesBar = ({
 const TypingIndicator = ({ userNames }: { userNames: string[] }) => {
   if (userNames.length === 0) return null;
   const text = userNames.length === 1
-    ? `${userNames[0]} đang nhập...`
+    ? userNames[0].startsWith("AI Assistant")
+      ? `${userNames[0]}...`
+      : `${userNames[0]} đang nhập...`
     : `${userNames.join(', ')} đang nhập...`;
   return (
     <div className="flex items-center gap-2 px-4 py-1">
