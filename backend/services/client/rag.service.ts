@@ -59,14 +59,6 @@ export const ingestDocumentService = async (documentId: string) => {
     console.log(`\n[RAG Ingestion SUCCESS] Đã tạo embedding và cập nhật database thành công cho file: "${doc.name}" (ID: ${doc.id}) với ${chunksToEmbed.length} chunks.\n`);
   } catch (err: any) {
     console.error(`[RAG Ingestion] Lỗi xử lý tài liệu ${documentId}:`, err.message);
-    try {
-      await prisma.document.update({
-        where: { id: documentId },
-        data: { isEmbedded: true }
-      });
-    } catch (dbErr) {
-      console.error(`[RAG Ingestion] Không thể cập nhật trạng thái lỗi cho tài liệu ${documentId}:`, dbErr);
-    }
     throw err;
   }
 }

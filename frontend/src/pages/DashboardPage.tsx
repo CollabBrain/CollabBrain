@@ -4,7 +4,7 @@ import { useProfile } from '../features/profile/hooks/useProfile';
 import { useTodos, useUpdateTodo, parseTodoAttachments } from '../hooks/useTodos';
 import type { TodoItem } from '../hooks/useTodos';
 import { APP_NAME, ROUTES } from '../constants';
-import { Card, CardContent } from '../components/ui/Card';
+import { Card, CardContent } from '../components/ui/card';
 import { Button } from '../components/ui/button';
 import {
   MessagesSquare,

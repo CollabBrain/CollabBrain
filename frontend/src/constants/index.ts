@@ -22,4 +22,5 @@ export const ROUTES = {
   GROUPS: '/groups',
   FRIENDS: '/friends',
   FLASHCARD: '/flashcard',
+  DOCS: '/docs',
 } as const;
