@@ -21,31 +21,31 @@ model Account {
 }
 
 model User {
-  id             String             @id @default(uuid())
-  email          String             @unique
-  passwordHash   String             @map("password_hash")
-  name           String
-  avatarUrl      String?            @map("avatar_url")
-  coverUrl       String?            @map("cover_url")
-  bio            String?
-  status         String?
-  statusExpiresAt DateTime?         @map("status_expires_at")
-  isActive       Boolean           @default(true) @map("is_active")
-  isDeleted      Boolean           @default(false) @map("is_deleted")
-  createdAt      DateTime          @default(now()) @map("created_at")
-  updatedAt      DateTime          @updatedAt @map("updated_at")
-  groups         GroupMember[]
-  documents      Document[]
-  receivedFriendships Friendship[]  @relation("ReceivedFriendships")
-  sentFriendships     Friendship[]  @relation("SentFriendships")
-  sentInvitations    GroupInvitation[] @relation("InvitationSender")
-  groupInvitations   GroupInvitation[] @relation("InvitationUser")
-  messageMentions    MessageMention[]
-  pinnedMessages     Message[]     @relation("PinnedMessages")
-  receivedMessages   Message[]     @relation("ReceivedMessages")
-  sentMessages       Message[]     @relation("SentMessages")
-  reportsSent        Report[]      @relation("Reporter")
-  reportsReceived    Report[]      @relation("ReportedUser")
+  id        String        @id @default(uuid())
+  email     String        @unique
+  passwordHash String     @map("password_hash")
+  name      String
+  avatarUrl String?       @map("avatar_url")
+  coverUrl  String?       @map("cover_url")
+  bio       String?
+  status    String?       // max 80 chars — e.g. "Đang học 📚"
+  statusExpiresAt DateTime? @map("status_expires_at") // tự ẩn sau 24h
+  isActive  Boolean       @default(true) @map("is_active")
+  isDeleted Boolean       @default(false) @map("is_deleted")
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+  groups              GroupMember[]
+  documents           Document[]
+  receivedFriendships Friendship[]      @relation("ReceivedFriendships")
+  sentFriendships     Friendship[]      @relation("SentFriendships")
+  sentInvitations     GroupInvitation[] @relation("InvitationSender")
+  groupInvitations    GroupInvitation[] @relation("InvitationUser")
+  messageMentions     MessageMention[]
+  pinnedMessages      Message[]         @relation("PinnedMessages")
+  receivedMessages    Message[]         @relation("ReceivedMessages")
+  sentMessages        Message[]         @relation("SentMessages")
+  reportsSent         Report[]          @relation("Reporter")
+  reportsReceived     Report[]          @relation("ReportedUser")
   decks              Deck[]
   deckShares         DeckShare[]
   reviews            Review[]

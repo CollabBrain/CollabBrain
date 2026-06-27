@@ -99,7 +99,7 @@ const AdminLayout = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/admin/login');
+    window.location.replace('/admin/login');
   };
 
   const closeMobile = () => setIsMobileOpen(false);

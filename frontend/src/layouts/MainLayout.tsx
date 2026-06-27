@@ -150,7 +150,7 @@ const MainLayout = () => {
 
   const handleLogout = () => {
     logout();
-    navigate(ROUTES.LOGIN);
+    window.location.replace(ROUTES.LOGIN);
   };
 
   const closeMobile = () => setIsMobileOpen(false);

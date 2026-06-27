@@ -5,7 +5,7 @@ import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import { initSocket } from '../socket/socket';
 import { ErrorBoundary } from '../components/ErrorBoundary';
-import { uploadPersonalDocumentApi } from '../features/group/services/document.service';
+import { uploadPersonalDocumentApi, getPersonalDocumentsApi } from '../features/group/services/document.service';
 import { queryRagApi } from '../features/chat/services/chat.service';
 import { useSettings } from '../hooks/useSettings';
 
@@ -164,6 +164,7 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
   const [inputValue, setInputValue] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [typingStatus, setTypingStatus] = useState<string>('');
   const [previewPdfUrl, setPreviewPdfUrl] = useState<string | null>(null);
   const [isPdfCollapsed, setIsPdfCollapsed] = useState(false);
   const [customAlert, setCustomAlert] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -398,9 +399,11 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
   };
 
   const handleSend = async () => {
+    if (isUploadingFile || isTyping) return;
     const text = inputValue.trim();
     if (!text && !attachedFile) return;
 
+    const hasAttachedFile = !!attachedFile;
     let uploadFailed = false;
 
     // 1. Gửi tệp đính kèm riêng biệt (Tin nhắn thứ nhất)
@@ -497,8 +500,46 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
 
     // Sử dụng câu hỏi mặc định nếu chỉ gửi file
     const queryText = text || "Hãy tóm tắt nội dung chính của tài liệu này giúp tôi.";
+    setTypingStatus('Đang kiểm tra tài liệu... (0s)');
+
+    let seconds = 0;
+    const timer = setInterval(() => {
+      seconds += 1;
+      setTypingStatus((prev) => {
+        if (prev.startsWith('Đang suy nghĩ')) {
+          return `Đang suy nghĩ... (${seconds}s)`;
+        } else if (prev.startsWith('Đang phân tích')) {
+          return `Đang phân tích tài liệu... (${seconds}s)`;
+        } else {
+          return `Đang chuẩn bị phản hồi... (${seconds}s)`;
+        }
+      });
+    }, 1000);
 
     try {
+      // Hàm kiểm tra xem có tài liệu nào đang chờ tạo chỉ mục (embedding) không
+      const checkPendingDocs = async () => {
+        if (!currentUserId) return false;
+        try {
+          const res = await getPersonalDocumentsApi({ limit: 100 });
+          const docs = res.data?.data?.data || [];
+          return docs.some((d: any) => !d.isEmbedded);
+        } catch (err) {
+          console.error("Lỗi kiểm tra trạng thái tài liệu:", err);
+          return false;
+        }
+      };
+
+      let hasPending = await checkPendingDocs();
+      if (hasPending) {
+        setTypingStatus(`Đang phân tích tài liệu... (${seconds}s)`);
+        while (hasPending) {
+          await new Promise((resolve) => setTimeout(resolve, 2000));
+          hasPending = await checkPendingDocs();
+        }
+      }
+
+      setTypingStatus(`Đang suy nghĩ... (${seconds}s)`);
       const res = await queryRagApi(queryText, undefined, aiConvId);
       const answerData = res.data.data;
       if (!answerData) {
@@ -509,6 +550,19 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
       if (answerData.sources && answerData.sources.length > 0) {
         const uniqueDocs = Array.from(new Set(answerData.sources.map((s: any) => s.documentName)));
         responseText += `\n\n**Nguồn tham khảo:**\n` + uniqueDocs.map((doc: string) => `* 📎 ${doc}`).join('\n');
+      }
+      const lower = queryText.toLowerCase();
+      if (lower.includes('hello') || lower.includes('hi') || lower.includes('xin chào')) {
+        responseText = `Xin chào ${profile?.name || 'bạn'}! Tôi là Trợ lý học tập AI của ${webName}. Hôm nay tôi có thể hỗ trợ gì cho bạn? Bạn có thể gửi tài liệu học tập hoặc đặt bất cứ câu hỏi nào cho tôi.`;
+      } else if (lower.includes('quiz') || lower.includes('trắc nghiệm') || lower.includes('kiểm tra')) {
+        responseText = `Tuyệt vời! Chúng ta hãy làm một câu hỏi trắc nghiệm Sinh học nhanh nhé:
+
+**Sự khác biệt chính về kết quả tế bào giữa Nguyên phân (Mitosis) và Giảm phân (Meiosis) là gì?**
+* **A)** Nguyên phân tạo 4 tế bào độc nhất, Giảm phân tạo 2 tế bào giống hệt.
+* **B)** Nguyên phân tạo 2 tế bào lưỡng bội (diploid) giống hệt nhau, Giảm phân tạo 4 tế bào giao tử đơn bội (haploid) độc nhất.
+* **C)** Nguyên phân chỉ xảy ra ở thực vật, Giảm phân chỉ xảy ra ở động vật.
+
+*Nhập đáp án A, B hoặc C của bạn bên dưới nhé!*`;
       }
       setMessages((prev) => [
         ...prev,
@@ -531,11 +585,12 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
         },
       ]);
     } finally {
+      clearInterval(timer);
       setIsTyping(false);
+      setTypingStatus('');
     }
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
     if (!files || files.length === 0) return;
     const file = files[0];
@@ -819,14 +874,21 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
 
               {/* Chỉ báo AI đang soạn tin */}
               {isTyping && (
-                <div className="flex gap-4 items-start justify-start">
+                <div className="flex gap-4 items-start justify-start animate-fade-in">
                   <div className="w-8 h-8 rounded-xl bg-indigo-50 shrink-0 flex items-center justify-center shadow-sm">
                     <Sparkles className="w-4 h-4 text-indigo-600" />
                   </div>
-                  <div className="bg-white border border-slate-100 rounded-3xl rounded-tl-sm p-4 flex items-center gap-1 shadow-sm">
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" />
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce delay-150" />
-                    <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce delay-300" />
+                  <div className="bg-white border border-slate-100 rounded-3xl rounded-tl-sm p-4 flex flex-col gap-2 shadow-sm min-w-[140px]">
+                    <div className="flex items-center gap-1">
+                      <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce" />
+                      <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce delay-150" />
+                      <span className="w-2 h-2 rounded-full bg-indigo-400 animate-bounce delay-300" />
+                    </div>
+                    {typingStatus && (
+                      <span className="text-[11px] font-extrabold text-indigo-500 animate-pulse mt-0.5 leading-none">
+                        {typingStatus}
+                      </span>
+                    )}
                   </div>
                 </div>
               )}
