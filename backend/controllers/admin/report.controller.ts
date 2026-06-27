@@ -30,7 +30,7 @@ export const getReports = async (req: Request, res: Response) => {
 export const resolveReport = async (req: Request, res: Response) => {
   try {
     const id = req.params.id as string;
-    const { status } = req.body;
+    const { status, resolutionNotes } = req.body;
 
     if (!status || !Object.values(ReportStatus).includes(status)) {
       return res.status(400).json({
@@ -39,7 +39,7 @@ export const resolveReport = async (req: Request, res: Response) => {
       });
     }
 
-    const result = await reportRepo.updateReportStatus(id, status as ReportStatus);
+    const result = await reportRepo.updateReportStatus(id, status as ReportStatus, resolutionNotes);
 
     res.status(200).json({
       success: true,

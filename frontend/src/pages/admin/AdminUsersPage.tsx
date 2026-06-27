@@ -166,10 +166,10 @@ const AdminUsersPage = () => {
       {/* Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-white tracking-tight">
+          <h1 className="text-2xl font-bold text-white tracking-tight">
             Quản lý Người dùng
           </h1>
-          <p className="text-slate-400 text-sm font-medium mt-1">
+          <p className="text-slate-400 text-xs font-medium mt-1">
             Xem danh sách, chỉnh sửa thông tin, khóa hoặc xóa tài khoản sinh viên
           </p>
         </div>

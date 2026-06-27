@@ -208,17 +208,18 @@ model MessageMention {
 }
 
 model Report {
-  id             String       @id @default(uuid())
-  reporterId     String       @map("reporter_id")
-  targetUserId   String?      @map("target_user_id")
-  targetGroupId  String?      @map("target_group_id")
-  reason         String
-  status         ReportStatus @default(PENDING)
-  createdAt      DateTime     @default(now()) @map("created_at")
-  updatedAt      DateTime     @updatedAt @map("updated_at")
-  reporter       User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  targetGroup    Group?       @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
-  targetUser     User?        @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  id              String       @id @default(uuid())
+  reporterId      String       @map("reporter_id")
+  targetUserId    String?      @map("target_user_id")
+  targetGroupId   String?      @map("target_group_id")
+  reason          String
+  status          ReportStatus @default(PENDING)
+  resolutionNotes String?      @map("resolution_notes")
+  createdAt       DateTime     @default(now()) @map("created_at")
+  updatedAt       DateTime     @updatedAt @map("updated_at")
+  reporter        User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetGroup     Group?       @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
+  targetUser      User?        @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   @@map("reports")
 }

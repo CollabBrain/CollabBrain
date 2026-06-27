@@ -71,13 +71,13 @@ const AdminSettingsPage = () => {
       <div className="flex flex-col gap-1 border-b border-slate-800 pb-5">
         <div className="flex items-center gap-3">
           <div className="p-2 rounded-2xl bg-indigo-600/10 border border-indigo-500/20 text-indigo-400">
-            <Settings className="w-7 h-7" />
+            <Settings className="w-6 h-6" />
           </div>
-          <h1 className="text-3xl font-black text-white tracking-tight">
+          <h1 className="text-2xl font-bold text-white tracking-tight">
             Cài đặt hệ thống
           </h1>
         </div>
-        <p className="text-slate-400 text-sm font-semibold pl-14">
+        <p className="text-slate-400 text-xs font-semibold pl-14">
           Thay đổi thương hiệu hiển thị động như Tên ứng dụng trên thanh Sidebar, mobile header, trang Landing Page và văn bản Footer.
         </p>
       </div>

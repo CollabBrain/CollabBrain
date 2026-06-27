@@ -46,10 +46,13 @@ export const findReports = async (
   return { reports, total };
 };
 
-export const updateReportStatus = async (id: string, status: ReportStatus) => {
+export const updateReportStatus = async (id: string, status: ReportStatus, resolutionNotes?: string) => {
   return prisma.report.update({
     where: { id },
-    data: { status },
+    data: { 
+      status,
+      resolutionNotes: resolutionNotes || null
+    },
     include: {
       reporter: { select: { name: true } }
     }

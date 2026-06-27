@@ -108,10 +108,10 @@ const AdminStatsPage = () => {
     <div className="space-y-8 animate-in fade-in duration-300">
       {/* Title */}
       <div>
-        <h1 className="text-3xl font-black text-white tracking-tight">
+        <h1 className="text-2xl font-bold text-white tracking-tight">
           Tổng quan Hệ thống
         </h1>
-        <p className="text-slate-400 text-sm font-medium mt-1">
+        <p className="text-slate-400 text-xs font-medium mt-1">
           Báo cáo thống kê hoạt động thời gian thực của dự án CollabBrain
         </p>
       </div>
