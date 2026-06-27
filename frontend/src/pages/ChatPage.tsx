@@ -548,8 +548,8 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
       
       let responseText = answerData.answer;
       if (answerData.sources && answerData.sources.length > 0) {
-        const uniqueDocs = Array.from(new Set(answerData.sources.map(s => s.documentName)));
-        responseText += `\n\n**Nguồn tham khảo:**\n` + uniqueDocs.map(doc => `* 📎 ${doc}`).join('\n');
+        const uniqueDocs = Array.from(new Set(answerData.sources.map((s: any) => s.documentName)));
+        responseText += `\n\n**Nguồn tham khảo:**\n` + uniqueDocs.map((doc: string) => `* 📎 ${doc}`).join('\n');
       }
       const lower = queryText.toLowerCase();
       if (lower.includes('hello') || lower.includes('hi') || lower.includes('xin chào')) {
@@ -564,7 +564,6 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
 
 *Nhập đáp án A, B hoặc C của bạn bên dưới nhé!*`;
       }
-
       setMessages((prev) => [
         ...prev,
         {

@@ -23,6 +23,9 @@ interface ChatState {
   // Pinned messages
   pinnedMessagesByConversation: Record<string, Message[]>;
 
+  // Tính tổng số tin nhắn chưa đọc
+  totalUnreadCount: number;
+
   // ——— Actions ———
   setConversations: (convs: Conversation[]) => void;
   addOrUpdateConversation: (conv: Conversation) => void;
@@ -43,6 +46,8 @@ interface ChatState {
 
   setPinnedMessages: (conversationId: string, messages: Message[]) => void;
   togglePinnedMessage: (conversationId: string, message: Message, isPinned: boolean) => void;
+
+  recalcTotalUnread: () => void;
 }
 
 export const useChatStore = create<ChatState>((set, get) => ({
@@ -54,6 +59,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   messagePage: {},
   hasMoreMessages: {},
   pinnedMessagesByConversation: {},
+  totalUnreadCount: 0,
 
   setConversations: (convs) =>
     set((state) => {
@@ -78,7 +84,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return state; // No change — don't trigger re-render
       }
 
-      return { conversations: merged };
+      return {
+        conversations: merged,
+        totalUnreadCount: merged.reduce((acc, c) => acc + (c.unreadCount || 0), 0),
+      };
     }),
 
   addOrUpdateConversation: (conv) =>
@@ -99,7 +108,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         return finalB - finalA;
       });
 
-      return { conversations: sorted };
+      return {
+        conversations: sorted,
+        totalUnreadCount: sorted.reduce((acc, c) => acc + (c.unreadCount || 0), 0),
+      };
     }),
 
   setActiveConversation: (id) => set({ activeConversationId: id }),
@@ -138,11 +150,16 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }),
 
   markConversationRead: (conversationId) =>
-    set((state) => ({
-      conversations: state.conversations.map((c) =>
+    set((state) => {
+      const hasChange = state.conversations.some((c) => c.id === conversationId && c.unreadCount && c.unreadCount > 0);
+      const updated = state.conversations.map((c) =>
         c.id === conversationId ? { ...c, unreadCount: 0 } : c
-      ),
-    })),
+      );
+      return {
+        conversations: updated,
+        ...(hasChange ? { totalUnreadCount: updated.reduce((acc, c) => acc + (c.unreadCount || 0), 0) } : {}),
+      };
+    }),
 
   setTyping: (conversationId, userId, isTyping) =>
     set((state) => {
@@ -210,6 +227,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
         messagesByConversation: { ...state.messagesByConversation, [conversationId]: newMsgs }
       };
     }),
+
+  recalcTotalUnread: () =>
+    set((state) => ({
+      totalUnreadCount: state.conversations.reduce((acc, c) => acc + (c.unreadCount || 0), 0),
+    })),
 }));
 
 // ——— Selectors ———

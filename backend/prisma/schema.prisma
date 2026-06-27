@@ -46,7 +46,11 @@ model User {
   sentMessages        Message[]         @relation("SentMessages")
   reportsSent         Report[]          @relation("Reporter")
   reportsReceived     Report[]          @relation("ReportedUser")
-  todos               Todo[]
+  decks              Deck[]
+  deckShares         DeckShare[]
+  reviews            Review[]
+  todos              Todo[]
+  notificationSettings UserNotificationSettings?
   @@map("users")
 }
 
@@ -55,18 +59,18 @@ model Group {
   name        String
   description String?
   avatarUrl   String?           @map("avatar_url")
+  coverUrl    String?           @map("cover_url")
+  visibility  GroupVisibility   @default(PUBLIC)
   isActive    Boolean           @default(true) @map("is_active")
   isDeleted   Boolean           @default(false) @map("is_deleted")
   createdAt   DateTime          @default(now()) @map("created_at")
   updatedAt   DateTime          @updatedAt @map("updated_at")
-  visibility  GroupVisibility   @default(PUBLIC)
-  coverUrl    String?           @map("cover_url")
   documents   Document[]
   invitations GroupInvitation[]
   members     GroupMember[]
   messages    Message[]
   reports     Report[]
-
+  decks       Deck[]
   @@map("groups")
 }
 
@@ -84,22 +88,22 @@ model GroupMember {
 }
 
 model Document {
-  id         String          @id @default(uuid())
-  name       String
-  type       DocumentType
-  url        String
-  size       Int?
-  isEmbedded Boolean         @default(false) @map("is_embedded")
-  isDeleted  Boolean         @default(false) @map("is_deleted")
-  createdAt  DateTime        @default(now()) @map("created_at")
-  groupId    String?         @map("group_id")
-  conversationId String?         @map("conversation_id")
-  uploadedBy String          @map("uploaded_by")
-  mimeType   String?         @map("mime_type")
-  updatedAt  DateTime        @updatedAt @map("updated_at")
-  chunks     DocumentChunk[]
-  group      Group?          @relation(fields: [groupId], references: [id])
-  uploader   User            @relation(fields: [uploadedBy], references: [id])
+  id              String          @id @default(uuid())
+  name            String
+  type            DocumentType
+  url             String
+  size            Int?
+  mimeType        String?         @map("mime_type")
+  isEmbedded      Boolean         @default(false) @map("is_embedded")
+  isDeleted       Boolean         @default(false) @map("is_deleted")
+  createdAt       DateTime        @default(now()) @map("created_at")
+  updatedAt       DateTime        @updatedAt @map("updated_at")
+  groupId         String?         @map("group_id")
+  conversationId  String?         @map("conversation_id")
+  uploadedBy      String          @map("uploaded_by")
+  chunks          DocumentChunk[]
+  group           Group?          @relation(fields: [groupId], references: [id])
+  uploader        User            @relation(fields: [uploadedBy], references: [id])
 
   @@index([groupId, createdAt])
   @@index([uploadedBy, createdAt])
@@ -111,16 +115,11 @@ model DocumentChunk {
   id          String   @id @default(uuid())
   content     String
   chunkIndex  Int      @map("chunk_index")
-
   contentHash String?  @unique
-
   embedding   Unsupported("vector(384)")?
-
   isEmbedded  Boolean  @default(false)
-
   documentId  String   @map("document_id")
   document    Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-
   createdAt   DateTime @default(now()) @map("created_at")
 
   @@index([documentId, chunkIndex])
@@ -138,30 +137,30 @@ model OtpVerification {
 }
 
 model Friendship {
-  senderId   String           @map("sender_id")
-  receiverId String           @map("receiver_id")
-  status     FriendshipStatus @default(PENDING)
-  createdAt  DateTime         @default(now()) @map("created_at")
-  updatedAt  DateTime         @updatedAt @map("updated_at")
-  receiver   User             @relation("ReceivedFriendships", fields: [receiverId], references: [id], onDelete: Cascade)
-  sender     User             @relation("SentFriendships", fields: [senderId], references: [id], onDelete: Cascade)
+  senderId   String             @map("sender_id")
+  receiverId String             @map("receiver_id")
+  status     FriendshipStatus   @default(PENDING)
+  createdAt  DateTime          @default(now()) @map("created_at")
+  updatedAt  DateTime          @updatedAt @map("updated_at")
+  receiver   User               @relation("ReceivedFriendships", fields: [receiverId], references: [id], onDelete: Cascade)
+  sender     User               @relation("SentFriendships", fields: [senderId], references: [id], onDelete: Cascade)
 
   @@id([senderId, receiverId])
   @@map("friendships")
 }
 
 model GroupInvitation {
-  id        String           @id @default(uuid())
+  id        String             @id @default(uuid())
   type      InvitationType
-  status    InvitationStatus @default(PENDING)
-  groupId   String           @map("group_id")
-  userId    String           @map("user_id")
-  invitedBy String?          @map("invited_by")
-  createdAt DateTime         @default(now()) @map("created_at")
-  updatedAt DateTime         @updatedAt @map("updated_at")
-  group     Group            @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  sender    User?            @relation("InvitationSender", fields: [invitedBy], references: [id])
-  user      User             @relation("InvitationUser", fields: [userId], references: [id], onDelete: Cascade)
+  status    InvitationStatus   @default(PENDING)
+  groupId   String             @map("group_id")
+  userId    String             @map("user_id")
+  invitedBy String?            @map("invited_by")
+  createdAt DateTime          @default(now()) @map("created_at")
+  updatedAt DateTime          @updatedAt @map("updated_at")
+  group     Group              @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  sender    User?              @relation("InvitationSender", fields: [invitedBy], references: [id])
+  user      User               @relation("InvitationUser", fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([groupId, userId])
   @@map("group_invitations")
@@ -209,20 +208,157 @@ model MessageMention {
 }
 
 model Report {
-  id            String       @id @default(uuid())
-  reporterId    String       @map("reporter_id")
-  targetUserId  String?      @map("target_user_id")
-  targetGroupId String?      @map("target_group_id")
-  reason        String
-  status        ReportStatus @default(PENDING)
-  createdAt     DateTime     @default(now()) @map("created_at")
-  updatedAt     DateTime     @updatedAt @map("updated_at")
-  reporter      User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
-  targetGroup   Group?       @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
-  targetUser    User?        @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
+  id             String       @id @default(uuid())
+  reporterId     String       @map("reporter_id")
+  targetUserId   String?      @map("target_user_id")
+  targetGroupId  String?      @map("target_group_id")
+  reason         String
+  status         ReportStatus @default(PENDING)
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+  reporter       User         @relation("Reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  targetGroup    Group?       @relation(fields: [targetGroupId], references: [id], onDelete: Cascade)
+  targetUser     User?        @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   @@map("reports")
 }
+
+model SiteSetting {
+  id        String   @id @default(uuid())
+  key       String   @unique
+  value     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("site_settings")
+}
+
+model Todo {
+  id          String    @id @default(uuid())
+  userId      String    @map("user_id")
+  title       String
+  description String?
+  dueDate     DateTime? @map("due_date")
+  isCompleted Boolean   @default(false) @map("is_completed")
+  isNotify    Boolean   @default(false) @map("is_notify")
+  attachments String?   @map("attachments")
+  createdAt   DateTime  @default(now()) @map("created_at")
+  updatedAt   DateTime  @updatedAt @map("updated_at")
+
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("todos")
+}
+
+model UserNotificationSettings {
+  id              String   @id @default(uuid())
+  userId          String   @unique @map("user_id")
+  enableAll       Boolean  @default(true) @map("enable_all")
+  enableChat      Boolean  @default(true) @map("enable_chat")
+  enableFriend    Boolean  @default(true) @map("enable_friend")
+  enableGroup     Boolean  @default(true) @map("enable_group")
+  enableSystem    Boolean  @default(true) @map("enable_system")
+  enableSound     Boolean  @default(true) @map("enable_sound")
+  enableVibrate   Boolean  @default(true) @map("enable_vibrate")
+  chatPriority    String   @default("HIGH") @map("chat_priority")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_settings")
+}
+
+// ============================================================
+// ——— FLASHCARD MODELS ———
+// ============================================================
+
+enum CardDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+model Deck {
+  id          String      @id @default(uuid())
+  name        String
+  description String?
+  color       String      @default("#3B82F6")
+  icon        String?
+  isPublic    Boolean     @default(false) @map("is_public")
+  isDeleted   Boolean     @default(false) @map("is_deleted")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+
+  createdBy   String      @map("created_by")
+  creator     User        @relation(fields: [createdBy], references: [id])
+
+  groupId     String?     @map("group_id")
+  group       Group?      @relation(fields: [groupId], references: [id])
+
+  cards       Flashcard[]
+  shares      DeckShare[]
+
+  @@map("decks")
+}
+
+model DeckShare {
+  id        String   @id @default(uuid())
+  deckId    String   @map("deck_id")
+  userId    String   @map("user_id")
+  canEdit   Boolean  @default(false) @map("can_edit")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  deck  Deck  @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  user  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([deckId, userId])
+  @@map("deck_shares")
+}
+
+model Flashcard {
+  id          String          @id @default(uuid())
+  deckId      String          @map("deck_id")
+  front       String
+  back        String
+  hint        String?
+  imageUrl    String?         @map("image_url")
+  tags        String[]
+  difficulty  CardDifficulty  @default(MEDIUM)
+  isDeleted   Boolean         @default(false) @map("is_deleted")
+  createdAt   DateTime        @default(now()) @map("created_at")
+  updatedAt   DateTime        @updatedAt @map("updated_at")
+
+  deck    Deck     @relation(fields: [deckId], references: [id], onDelete: Cascade)
+  reviews Review[]
+
+  nextReviewAt DateTime? @map("next_review_at")
+  intervalDays Int       @default(1) @map("interval_days")
+  easeFactor   Float     @default(2.5) @map("ease_factor")
+  repetitions  Int       @default(0)
+
+  @@map("flashcards")
+}
+
+model Review {
+  id         String    @id @default(uuid())
+  cardId     String    @map("card_id")
+  userId     String    @map("user_id")
+  quality    Int
+  timeSpent  Int?      @map("time_spent")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  card  Flashcard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  user  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([cardId, userId, createdAt])
+  @@map("reviews")
+}
+
+// ============================================================
+// ——— ENUMS ———
+// ============================================================
 
 enum AccountRole {
   ADMIN
@@ -277,31 +413,4 @@ enum InvitationStatus {
 enum ReportStatus {
   PENDING
   RESOLVED
-}
-model SiteSetting {
-  id        String   @id @default(uuid())
-  key       String   @unique
-  value     String
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
-
-  @@map("site_settings")
-}
-
-model Todo {
-  id          String    @id @default(uuid())
-  userId      String    @map("user_id")
-  title       String
-  description String?
-  dueDate     DateTime? @map("due_date")
-  isCompleted Boolean   @default(false) @map("is_completed")
-  isNotify    Boolean   @default(false) @map("is_notify")
-  attachments String?   @map("attachments")
-  createdAt   DateTime  @default(now()) @map("created_at")
-  updatedAt   DateTime  @updatedAt @map("updated_at")
-
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId, createdAt])
-  @@map("todos")
 }

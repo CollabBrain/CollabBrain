@@ -1,51 +1,118 @@
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 import { useProfile } from '../features/profile/hooks/useProfile';
 import { useTodos, useUpdateTodo, parseTodoAttachments } from '../hooks/useTodos';
 import type { TodoItem } from '../hooks/useTodos';
-import { Link } from 'react-router-dom';
+import { APP_NAME, ROUTES } from '../constants';
+import { Card, CardContent } from '../components/ui/Card';
+import { Button } from '../components/ui/button';
 import {
+  MessagesSquare,
+  FileText,
+  Layers,
+  Users,
+  UserRoundPen,
+  User,
+  Sparkles,
+  ArrowRight,
+  BookOpen,
   Calendar,
   CheckCircle,
-  Clock,
   AlertCircle,
   Bell,
   ListTodo,
   Paperclip,
   Link2,
   Check,
-  ArrowRight,
-  Sparkles,
-  BookOpen,
-  TrendingUp,
   Loader2,
+  Clock,
+  TrendingUp,
 } from 'lucide-react';
+
+type ShortcutItem = {
+  label: string;
+  description: string;
+  to: string;
+  icon: React.ReactNode;
+  accent: string;
+};
+
+const shortcuts: ShortcutItem[] = [
+  {
+    label: 'Tin nhắn',
+    description: 'Trò chuyện nhóm và riêng tư',
+    to: ROUTES.CHAT,
+    icon: <MessagesSquare className="h-6 w-6" />,
+    accent: 'bg-sky-50 text-sky-600 border-sky-100',
+  },
+  {
+    label: 'Tài liệu',
+    description: 'Xem và chia sẻ tài liệu',
+    to: ROUTES.DOCUMENTS,
+    icon: <FileText className="h-6 w-6" />,
+    accent: 'bg-amber-50 text-amber-600 border-amber-100',
+  },
+  {
+    label: 'Flashcard',
+    description: 'Học thuộc với thẻ ghi nhớ',
+    to: '/flashcard',
+    icon: <Layers className="h-6 w-6" />,
+    accent: 'bg-violet-50 text-violet-600 border-violet-100',
+  },
+  {
+    label: 'Bạn bè',
+    description: 'Quản lý kết nối của bạn',
+    to: ROUTES.FRIENDS,
+    icon: <Users className="h-6 w-6" />,
+    accent: 'bg-emerald-50 text-emerald-600 border-emerald-100',
+  },
+  {
+    label: 'Nhóm',
+    description: 'Khám phá nhóm học tập',
+    to: ROUTES.GROUPS,
+    icon: <UserRoundPen className="h-6 w-6" />,
+    accent: 'bg-rose-50 text-rose-600 border-rose-100',
+  },
+  {
+    label: 'Hồ sơ',
+    description: 'Chỉnh sửa thông tin cá nhân',
+    to: ROUTES.PROFILE,
+    icon: <User className="h-6 w-6" />,
+    accent: 'bg-indigo-50 text-indigo-600 border-indigo-100',
+  },
+];
 
 const DashboardPage = () => {
   const { data: profile } = useProfile();
-  const { data: todos = [], isLoading } = useTodos();
+  const { data: todos = [], isLoading: isTodosLoading } = useTodos();
   const updateTodoMutation = useUpdateTodo();
 
-  // Calculate statistics
+  const now = new Date();
+  const greeting = useMemo(() => {
+    if (now.getHours() < 12) return 'Chào buổi sáng';
+    if (now.getHours() < 18) return 'Chào buổi chiều';
+    return 'Chào buổi tối';
+  }, []);
+
+  const displayName = profile?.name || 'bạn';
+
+  // Todo stats
   const totalCount = todos.length;
   const completedCount = todos.filter((t) => t.isCompleted).length;
   const activeCount = totalCount - completedCount;
   const overdueCount = todos.filter((t) => {
     if (t.isCompleted || !t.dueDate) return false;
-    return new Date(t.dueDate) < new Date();
+    return new Date(t.dueDate) < now;
   }).length;
-
-  // Completion rate
   const completionRate = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 
-  // Today's todos
-  const today = new Date();
+  const today = now;
   const todayTodos = todos.filter((t) => {
     if (!t.dueDate) return false;
     const d = new Date(t.dueDate);
     return d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
   });
 
-  // Upcoming todos (next 24 hours, not completed, sorted by time)
-  const now = new Date();
   const twentyFourHoursLater = new Date(now.getTime() + 24 * 60 * 60 * 1000);
   const upcomingTodos = todos
     .filter((t) => {
@@ -55,7 +122,6 @@ const DashboardPage = () => {
     })
     .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
 
-  // Overdue todos (not completed, past due)
   const overdueTodos = todos
     .filter((t) => {
       if (t.isCompleted || !t.dueDate) return false;
@@ -84,13 +150,6 @@ const DashboardPage = () => {
     const hours = Math.floor(diffMins / 60);
     const mins = diffMins % 60;
     return `Còn ${hours}h${mins > 0 ? ` ${mins}p` : ""}`;
-  };
-
-  const getGreeting = () => {
-    const h = now.getHours();
-    if (h < 12) return "Chào buổi sáng";
-    if (h < 18) return "Chào buổi chiều";
-    return "Chào buổi tối";
   };
 
   const renderTodoCard = (todo: TodoItem, showTimeRemaining = false) => {
@@ -123,28 +182,24 @@ const DashboardPage = () => {
 
             <div className="flex flex-wrap items-center gap-2 mt-2">
               {todo.dueDate && (
-                <span
-                  className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-extrabold rounded-lg border ${
-                    todo.isCompleted
-                      ? "text-slate-400 bg-slate-100/50 border-slate-200/50"
-                      : isOverdue
-                      ? "text-rose-600 bg-rose-50 border-rose-100"
-                      : "text-indigo-600 bg-indigo-50/50 border-indigo-100/50"
-                  }`}
-                >
+                <span className={`inline-flex items-center gap-1 px-2 py-0.5 text-[10px] font-extrabold rounded-lg border ${
+                  todo.isCompleted
+                    ? "text-slate-400 bg-slate-100/50 border-slate-200/50"
+                    : isOverdue
+                    ? "text-rose-600 bg-rose-50 border-rose-100"
+                    : "text-indigo-600 bg-indigo-50/50 border-indigo-100/50"
+                }`}>
                   <Clock className="w-3 h-3 shrink-0" />
                   {formatTime(todo.dueDate)}
                 </span>
               )}
 
               {showTimeRemaining && todo.dueDate && !todo.isCompleted && (
-                <span
-                  className={`px-2 py-0.5 text-[10px] font-black rounded-lg border ${
-                    isOverdue
-                      ? "text-rose-600 bg-rose-50 border-rose-100 animate-pulse"
-                      : "text-amber-600 bg-amber-50 border-amber-100"
-                  }`}
-                >
+                <span className={`px-2 py-0.5 text-[10px] font-black rounded-lg border ${
+                  isOverdue
+                    ? "text-rose-600 bg-rose-50 border-rose-100 animate-pulse"
+                    : "text-amber-600 bg-amber-50 border-amber-100"
+                }`}>
                   {getTimeRemaining(todo.dueDate)}
                 </span>
               )}
@@ -156,7 +211,6 @@ const DashboardPage = () => {
               )}
             </div>
 
-            {/* Attachment badges */}
             {atts.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mt-2">
                 {atts.map((att, idx) => (
@@ -181,12 +235,8 @@ const DashboardPage = () => {
             )}
           </div>
 
-          {/* Quick complete button / Completion status check */}
           {todo.isCompleted ? (
-            <div
-              className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-650 flex items-center justify-center border border-emerald-100 shrink-0"
-              title="Đã hoàn thành"
-            >
+            <div className="h-8 w-8 rounded-xl bg-emerald-50 text-emerald-650 flex items-center justify-center border border-emerald-100 shrink-0">
               <CheckCircle className="w-4.5 h-4.5" />
             </div>
           ) : (
@@ -205,160 +255,231 @@ const DashboardPage = () => {
   };
 
   return (
-    <div className="space-y-6 text-left relative select-none">
-      {/* Welcome Header */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-violet-600 to-purple-700 rounded-[28px] p-8 text-white shadow-xl shadow-indigo-600/10">
-        {/* Decorative elements */}
-        <div className="absolute top-0 right-0 w-64 h-64 bg-white/5 rounded-full -translate-y-1/2 translate-x-1/4" />
-        <div className="absolute bottom-0 left-1/2 w-40 h-40 bg-white/5 rounded-full translate-y-1/2" />
-        
-        <div className="relative z-10">
-          <div className="flex items-center gap-2 mb-1">
-            <Sparkles className="w-5 h-5 text-amber-300" />
-            <span className="text-xs font-bold text-indigo-200 uppercase tracking-widest">{getGreeting()}</span>
-          </div>
-          <h1 className="text-2xl sm:text-3xl font-black tracking-tight">
-            {profile?.name || "Bạn"} 👋
-          </h1>
-          <p className="text-indigo-200 text-sm font-semibold mt-1.5 max-w-xl">
-            {upcomingTodos.length > 0
-              ? `Bạn có ${upcomingTodos.length} lịch học sắp diễn ra trong 24 giờ tới. Hãy chuẩn bị tốt nhé!`
-              : overdueCount > 0
-              ? `Có ${overdueCount} lịch học đã trễ hạn. Kiểm tra và cập nhật ngay nhé!`
-              : "Không có lịch học nào sắp tới. Hãy tận hưởng thời gian rảnh! 🎉"
-            }
-          </p>
-
-          {/* Quick action buttons */}
-          <div className="flex flex-wrap gap-3 mt-5">
-            <Link
-              to="/todos"
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-xl text-xs font-black text-white transition-all border border-white/10 hover:border-white/20 cursor-pointer"
-            >
-              <ListTodo className="w-4 h-4" />
-              Quản lý lịch học
-              <ArrowRight className="w-3.5 h-3.5" />
-            </Link>
-            <Link
-              to="/documents"
-              className="inline-flex items-center gap-1.5 px-4 py-2.5 bg-white/15 hover:bg-white/25 backdrop-blur-sm rounded-xl text-xs font-black text-white transition-all border border-white/10 hover:border-white/20 cursor-pointer"
-            >
-              <BookOpen className="w-4 h-4" />
-              Tài liệu học tập
-            </Link>
-          </div>
+    <div className="space-y-8">
+      {/* Header + App info */}
+      <div className="space-y-1">
+        <div className="inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-indigo-50 px-3 py-1 text-xs font-medium text-indigo-700">
+          <Sparkles className="h-3.5 w-3.5" />
+          {APP_NAME} — Nền tảng học tập thông minh
         </div>
+        <h1 className="text-3xl font-bold tracking-tight text-foreground">
+          {greeting}, {displayName}
+        </h1>
+        <p className="text-muted-foreground text-sm">
+          Không gian học tập kết nối, ghi nhớ và cộng tác mọi lúc mọi nơi.
+        </p>
       </div>
 
-
-
-      {isLoading ? (
-        <div className="py-16 flex flex-col items-center justify-center gap-2">
-          <Loader2 className="w-6 h-6 text-indigo-600 animate-spin" />
-          <span className="text-xs text-slate-400 font-bold">Đang tải dữ liệu...</span>
+      {/* Todo Stats Cards */}
+      {!isTodosLoading && totalCount > 0 && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <Card className="bg-white border border-slate-100">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-indigo-50 flex items-center justify-center">
+                  <ListTodo className="h-5 w-5 text-indigo-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-slate-800">{activeCount}</p>
+                  <p className="text-xs text-slate-400 font-semibold">Đang làm</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white border border-slate-100">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <CheckCircle className="h-5 w-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-slate-800">{completedCount}</p>
+                  <p className="text-xs text-slate-400 font-semibold">Hoàn thành</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white border border-slate-100">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-xl bg-amber-50 flex items-center justify-center">
+                  <TrendingUp className="h-5 w-5 text-amber-600" />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-slate-800">{completionRate}%</p>
+                  <p className="text-xs text-slate-400 font-semibold">Tỷ lệ hoàn thành</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="bg-white border border-slate-100">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className={`h-10 w-10 rounded-xl flex items-center justify-center ${overdueCount > 0 ? 'bg-rose-50' : 'bg-slate-50'}`}>
+                  <AlertCircle className={`h-5 w-5 ${overdueCount > 0 ? 'text-rose-600' : 'text-slate-400'}`} />
+                </div>
+                <div>
+                  <p className="text-2xl font-black text-slate-800">{overdueCount}</p>
+                  <p className="text-xs text-slate-400 font-semibold">Trễ hạn</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
-      ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Upcoming Study Alerts Section */}
-          <div className="bg-white border border-slate-100 rounded-3xl shadow-[0_8px_30px_rgba(99,102,241,0.015)] relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-[3px] bg-gradient-to-r from-amber-400 to-orange-500 rounded-t-3xl" />
-            <div className="p-6">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-50 mb-4">
-                <h3 className="text-sm font-black text-slate-700 flex items-center gap-2">
+      )}
+
+      {/* Quick access tiles */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Truy cập nhanh</h2>
+        </div>
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {shortcuts.map((item) => (
+            <Link key={item.to} to={item.to} className="group">
+              <Card className="h-full border border-border/60 bg-card/95 transition-all hover:border-primary/40 hover:shadow-md">
+                <CardContent className="flex h-full items-center gap-4 p-5">
+                  <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border ${item.accent}`}>
+                    {item.icon}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-semibold text-foreground">{item.label}</p>
+                    <p className="truncate text-xs text-muted-foreground">{item.description}</p>
+                  </div>
+                  <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-1" />
+                </CardContent>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </section>
+
+      {/* Upcoming & Overdue Todos */}
+      {!isTodosLoading && totalCount > 0 && (
+        <section className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h2 className="text-lg font-semibold text-foreground">Lịch học & Thông báo</h2>
+            <Button variant="ghost" size="sm" asChild className="gap-1 text-xs text-muted-foreground">
+              <Link to="/todos">Xem tất cả <ArrowRight className="h-3.5 w-3.5" /></Link>
+            </Button>
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* Upcoming */}
+            <Card className="border border-slate-100 bg-white overflow-hidden">
+              <div className="h-1 bg-gradient-to-r from-amber-400 to-orange-500" />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3">
                   <div className="w-7 h-7 rounded-lg bg-amber-50 border border-amber-100 flex items-center justify-center">
                     <Bell className="w-4 h-4 text-amber-500" />
                   </div>
-                  Thông báo & Lịch học sắp tới
-                </h3>
-                {upcomingTodos.length > 0 && (
-                  <span className="px-2.5 py-1 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-100 rounded-lg animate-pulse">
-                    {upcomingTodos.length} sắp tới
-                  </span>
-                )}
-              </div>
-
-              {upcomingTodos.length === 0 ? (
-                <div className="py-12 flex flex-col items-center justify-center gap-2.5">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
-                    <Calendar className="w-6 h-6" />
+                  <h3 className="text-sm font-black text-slate-700">Sắp tới (24h)</h3>
+                  {upcomingTodos.length > 0 && (
+                    <span className="ml-auto px-2 py-0.5 text-[10px] font-black text-amber-600 bg-amber-50 border border-amber-100 rounded-lg animate-pulse">
+                      {upcomingTodos.length}
+                    </span>
+                  )}
+                </div>
+                {upcomingTodos.length === 0 ? (
+                  <div className="py-8 flex flex-col items-center justify-center gap-2">
+                    <Calendar className="w-8 h-8 text-slate-200" />
+                    <p className="text-xs text-slate-400 font-semibold text-center">Không có lịch nào sắp tới</p>
                   </div>
-                  <p className="text-xs text-slate-400 font-bold text-center">
-                    Không có lịch học nào sắp diễn ra<br />trong 24 giờ tới
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                  {upcomingTodos.map((todo) => renderTodoCard(todo, true))}
-                </div>
-              )}
-            </div>
-          </div>
+                ) : (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {upcomingTodos.slice(0, 5).map((todo) => renderTodoCard(todo, true))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
 
-          {/* Overdue / Today's Schedule Section */}
-          <div className="bg-white border border-slate-100 rounded-3xl shadow-[0_8px_30px_rgba(99,102,241,0.015)] relative overflow-hidden">
-            <div className={`absolute top-0 left-0 right-0 h-[3px] rounded-t-3xl ${
-              overdueTodos.length > 0
-                ? "bg-gradient-to-r from-rose-400 to-pink-500"
-                : "bg-gradient-to-r from-indigo-400 to-violet-500"
-            }`} />
-            <div className="p-6">
-              <div className="flex items-center justify-between pb-3 border-b border-slate-50 mb-4">
-                <h3 className="text-sm font-black text-slate-700 flex items-center gap-2">
-                  <div className={`w-7 h-7 rounded-lg border flex items-center justify-center ${
-                    overdueTodos.length > 0
-                      ? "bg-rose-50 border-rose-100"
-                      : "bg-indigo-50 border-indigo-100"
-                  }`}>
-                    {overdueTodos.length > 0 ? (
+            {/* Overdue */}
+            <Card className="border border-slate-100 bg-white overflow-hidden">
+              <div className={`h-1 ${overdueCount > 0 ? 'bg-gradient-to-r from-rose-400 to-pink-500' : 'bg-gradient-to-r from-indigo-400 to-violet-500'}`} />
+              <CardContent className="p-5">
+                <div className="flex items-center gap-2 mb-3">
+                  <div className={`w-7 h-7 rounded-lg border flex items-center justify-center ${overdueCount > 0 ? 'bg-rose-50 border-rose-100' : 'bg-indigo-50 border-indigo-100'}`}>
+                    {overdueCount > 0 ? (
                       <AlertCircle className="w-4 h-4 text-rose-500" />
                     ) : (
                       <Calendar className="w-4 h-4 text-indigo-500" />
                     )}
                   </div>
-                  {overdueTodos.length > 0 ? "Lịch học trễ hạn" : "Lịch học hôm nay"}
-                </h3>
-                {overdueTodos.length > 0 && (
-                  <span className="px-2.5 py-1 text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-100 rounded-lg">
-                    {overdueTodos.length} trễ hạn
-                  </span>
-                )}
-                {overdueTodos.length === 0 && todayTodos.length > 0 && (
-                  <span className="px-2.5 py-1 text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg">
-                    {todayTodos.length} lịch hôm nay
-                  </span>
-                )}
-              </div>
-
-              {overdueTodos.length > 0 ? (
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                  {overdueTodos.slice(0, 5).map((todo) => renderTodoCard(todo, true))}
-                  {overdueTodos.length > 5 && (
-                    <Link
-                      to="/todos"
-                      className="block text-center text-[11px] font-bold text-indigo-600 hover:text-indigo-700 py-2 transition-colors"
-                    >
-                      Xem tất cả {overdueTodos.length} lịch trễ hạn →
-                    </Link>
+                  <h3 className="text-sm font-black text-slate-700">{overdueCount > 0 ? 'Trễ hạn' : 'Hôm nay'}</h3>
+                  {overdueCount > 0 && (
+                    <span className="ml-auto px-2 py-0.5 text-[10px] font-black text-rose-600 bg-rose-50 border border-rose-100 rounded-lg">
+                      {overdueCount}
+                    </span>
+                  )}
+                  {overdueCount === 0 && todayTodos.length > 0 && (
+                    <span className="ml-auto px-2 py-0.5 text-[10px] font-black text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-lg">
+                      {todayTodos.length}
+                    </span>
                   )}
                 </div>
-              ) : todayTodos.length > 0 ? (
-                <div className="space-y-3 max-h-[400px] overflow-y-auto pr-1">
-                  {todayTodos.map((todo) => renderTodoCard(todo, false))}
-                </div>
-              ) : (
-                <div className="py-12 flex flex-col items-center justify-center gap-2.5">
-                  <div className="w-14 h-14 rounded-2xl bg-slate-50 border border-slate-100 flex items-center justify-center text-slate-300">
-                    <CheckCircle className="w-6 h-6" />
+                {overdueCount > 0 ? (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {overdueTodos.slice(0, 5).map((todo) => renderTodoCard(todo, true))}
+                    {overdueCount > 5 && (
+                      <Link to="/todos" className="block text-center text-[11px] font-bold text-indigo-600 hover:text-indigo-700 py-2 transition-colors">
+                        Xem thêm {overdueCount - 5} lịch →
+                      </Link>
+                    )}
                   </div>
-                  <p className="text-xs text-slate-400 font-bold text-center">
-                    Không có lịch học nào hôm nay.<br />Hãy tận hưởng! 🎉
-                  </p>
-                </div>
-              )}
-            </div>
+                ) : todayTodos.length > 0 ? (
+                  <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                    {todayTodos.map((todo) => renderTodoCard(todo, false))}
+                  </div>
+                ) : (
+                  <div className="py-8 flex flex-col items-center justify-center gap-2">
+                    <CheckCircle className="w-8 h-8 text-slate-200" />
+                    <p className="text-xs text-slate-400 font-semibold text-center">Không có lịch nào hôm nay</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
+        </section>
+      )}
+
+      {/* Loading state */}
+      {isTodosLoading && (
+        <div className="py-8 flex items-center justify-center gap-2">
+          <Loader2 className="w-5 h-5 text-indigo-600 animate-spin" />
+          <span className="text-sm text-slate-400 font-semibold">Đang tải dữ liệu...</span>
         </div>
       )}
+
+      {/* Recently joined / activity summary */}
+      <section className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-foreground">Mới tham gia</h2>
+        </div>
+
+        <Card className="border-dashed border-border/60 bg-card/90">
+          <CardContent className="flex flex-col gap-4 py-6">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <BookOpen className="h-5 w-5" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  Tài khoản {displayName} đã sẵn sàng
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Bạn có thể bắt đầu bằng cách chọn một tính năng ở trên.
+                </p>
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="secondary" asChild>
+                <Link to={ROUTES.GROUPS}>Khám phá nhóm</Link>
+              </Button>
+              <Button size="sm" variant="outline" asChild>
+                <Link to="/flashcard">Tạo bộ flashcard</Link>
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </section>
     </div>
   );
 };

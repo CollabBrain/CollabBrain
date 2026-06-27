@@ -9,8 +9,6 @@ import {
   getGroupHistoryService, 
   togglePinMessageService,
   getPinnedMessagesService,
-  togglePinChatMessageService, 
-  getPinnedChatMessagesService, 
   recallGroupMessageService, 
   uploadGroupChatFileService 
 } from "../../services/client/chat.service";
@@ -540,27 +538,10 @@ export const deleteMessage = async (req: Request, res: Response) => {
   }
 };
 
-//[PATCH] /chat/messages/:msgId/pin
+//[PATCH] /chat/messages/:msgId/pin — toggle pin tin nhắn chat 1-1
 export const pinChatMessage = async (req: Request, res: Response) => {
   try {
-    const myId = (req as any).user.id;
-    const msgId = req.params.msgId as string;
-    const result = await togglePinChatMessageService(msgId, myId);
-    
-    const io = req.app.get("io");
-    if (io) {
-      // Phát tới người kia
-      const targetId = result.data.senderId === myId ? result.data.receiverId : result.data.senderId;
-      if (targetId) {
-        io.to(targetId).emit("chat:message_pinned", {
-          messageId: msgId,
-          message: result.data,
-          isPinned: result.isPinned,
-          conversationId: myId // the sender of the event
-        });
-      }
-    }
-    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+    return res.status(400).json({ code: 400, message: "Tính năng ghim tin nhắn đang được phát triển" });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }
@@ -569,10 +550,7 @@ export const pinChatMessage = async (req: Request, res: Response) => {
 //[GET] /chat/conversations/:conversationId/messages/pinned
 export const getPinnedChatMessages = async (req: Request, res: Response) => {
   try {
-    const myId = (req as any).user.id;
-    const targetId = req.params.conversationId as string;
-    const result = await getPinnedChatMessagesService(myId, targetId);
-    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+    return res.status(200).json({ code: 200, message: "Lấy danh sách tin nhắn ghim thành công", data: [] });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }
@@ -594,10 +572,10 @@ export const getGroupMessages = async (req: Request, res: Response) => {
       code: 200,
       message: result.message,
       data: {
-        messages: result.data.messages,
-        total: result.data.total,
+        messages: result.data,
+        total: result.data.length,
         page,
-        hasMore: page * limit < result.data.total
+        hasMore: result.data.length === limit
       }
     });
   } catch (error: any) {
@@ -610,9 +588,9 @@ export const sendGroupMessage = async (req: Request, res: Response) => {
   try {
     const myId = (req as any).user.id;
     const groupId = req.params.groupId as string;
-    const { content, type = "text", replyToId, mentionIds } = req.body;
+    const { content, type = "text" } = req.body;
     if (!content) return res.status(400).json({ code: 400, message: "Thiếu content" });
-    const result = await sendGroupMessageService(myId, groupId, content, (type as string).toUpperCase() as any, replyToId, mentionIds);
+    const result = await sendGroupMessageService(myId, groupId, content, (type as string).toUpperCase() as any);
     return res.status(200).json({ code: 200, message: result.message, data: result.data });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
@@ -622,19 +600,7 @@ export const sendGroupMessage = async (req: Request, res: Response) => {
 //[PATCH] /chat/groups/:groupId/messages/:msgId/pin  — toggle pin
 export const pinGroupMessage = async (req: Request, res: Response) => {
   try {
-    const myId = (req as any).user.id;
-    const groupId = req.params.groupId as string;
-    const msgId = req.params.msgId as string;
-    const result = await togglePinMessageService(groupId, msgId, myId);
-    const io = req.app.get("io");
-    if (io) {
-      io.to(`group:${groupId}`).emit("group:message_pinned", {
-        groupId,
-        message: result.data,
-        isPinned: result.isPinned
-      });
-    }
-    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+    return res.status(400).json({ code: 400, message: "Tính năng ghim tin nhắn đang được phát triển" });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }

@@ -4,8 +4,9 @@
   "description": "Tài liệu này quy định cách thức quản lý các nhánh (branch) và cú pháp ghi chú commit nhằm đảm bảo source code của dự án luôn thống nhất, dễ bảo trì và tối ưu cho quá trình làm việc nhóm cũng như CI/CD.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "nodemon index.ts",
     "start": "nodemon index.ts",
+    "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
     "start:prod": "node dist/index.js"
   },

@@ -1,8 +1,9 @@
 import { useState, memo, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, CheckSquare, Home } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, CheckSquare, Layers } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
+import { useChatStore } from '../store/useChatStore';
 import { ROUTES } from '../constants';
 import { cn } from '../lib/utils';
 import { CallOverlay } from '../features/chat/components/CallOverlay';
@@ -13,10 +14,11 @@ import { NotificationBell } from '../components/NotificationBell';
 
 // ——— Nav items config ———
 const NAV_ITEMS = [
-  { to: ROUTES.DASHBOARD, label: 'Home', icon: Home },
+  { to: ROUTES.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
   { to: ROUTES.CHAT, label: 'Chat', icon: MessageSquare },
   { to: ROUTES.DOCUMENTS, label: 'My Documents', icon: FileText },
-  { to: '/todolist', label: 'Todo List', icon: CheckSquare },
+  { to: '/flashcard', label: 'Flashcard', icon: Layers },
+  { to: '/todos', label: 'Todo List', icon: CheckSquare },
   { to: '/friends', label: 'Friends', icon: User },
   { to: '/groups', label: 'Groups', icon: Users },
   { to: ROUTES.PROFILE, label: 'Profile', icon: UserCircle },
@@ -64,6 +66,8 @@ const SidebarContent = memo(({
         <nav className="flex flex-col gap-1.5">
           {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
             const active = isActive(to);
+            const isChat = to === ROUTES.CHAT;
+            const totalUnread = useChatStore((s) => s.totalUnreadCount);
             return (
               <Link
                 key={to}
@@ -78,6 +82,11 @@ const SidebarContent = memo(({
               >
                 <Icon className={cn('h-5 w-5', active ? 'text-indigo-600' : 'text-slate-400')} />
                 {label}
+                {isChat && totalUnread > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                    {totalUnread > 99 ? '99+' : totalUnread}
+                  </span>
+                )}
                 {active && (
                   <span className="absolute right-0.5 top-[25%] bottom-[25%] w-1.5 rounded-l bg-indigo-600" />
                 )}
@@ -164,7 +173,6 @@ const MainLayout = () => {
       callType: 'audio' | 'video';
       callerInfo: { name: string; avatarUrl?: string | null };
     }) => {
-      // Bỏ qua nếu đang trong cuộc gọi khác
       if (status !== 'idle') {
         socket.emit('call:reject', { callerId: data.callerId, reason: 'busy' });
         return;
@@ -252,6 +260,11 @@ const MainLayout = () => {
           </div>
         ) : pathname.match(/^\/groups\/.+/) ? (
           // GroupWorkspacePage: full width, tự cuộn, không giới hạn max-width
+          <div className="flex-1 overflow-y-auto">
+            <Outlet />
+          </div>
+        ) : pathname.startsWith('/flashcard') ? (
+          // Flashcard pages: full width
           <div className="flex-1 overflow-y-auto">
             <Outlet />
           </div>

@@ -3,10 +3,12 @@ import { useProfile, useEditProfile, useUpdateStatus } from '../features/profile
 import FormInput from '../components/common/FormInput';
 import LoadingButton from '../components/common/LoadingButton';
 import { Button } from '../components/ui/button';
-import { Pencil, Calendar, Mail, User as UserIcon, Camera, Loader2, CheckCircle, AlertCircle, Smile, Clock } from 'lucide-react';
+import { Pencil, Calendar, Mail, User as UserIcon, Camera, Loader2, CheckCircle, AlertCircle, Smile, Clock, Bell } from 'lucide-react';
 import AvatarUpload from '../components/common/AvatarUpload';
 import RichTextEditor from '../components/common/RichTextEditor';
 import axiosInstance from '../services/axiosInstance';
+import { useAuthStore } from '../store/useAuthStore';
+import { NotificationSettingsPanel } from '../components/NotificationSettingsPanel';
 
 // ——— Quick status presets ———
 const STATUS_PRESETS = [
@@ -136,6 +138,7 @@ const ProfilePage = () => {
   const { data: user, isLoading, isError } = useProfile();
   const editMutation = useEditProfile();
   const statusMutation = useUpdateStatus();
+  const isAuthenticated = useAuthStore((s) => !!s.accessToken);
 
   const [isEditing, setIsEditing] = useState(false);
   const [showStatusEditor, setShowStatusEditor] = useState(false);
@@ -336,6 +339,28 @@ const ProfilePage = () => {
             onClear={handleStatusClear}
             isSaving={statusMutation.isPending}
           />
+        )}
+
+        {/* Notification Settings - only show when authenticated */}
+        {isAuthenticated && (
+          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setShowStatusEditor(false)}
+              className="w-full"
+            >
+              <div className="flex items-center gap-3 mb-4">
+                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
+                  <Bell className="h-5 w-5" />
+                </div>
+                <div className="text-left">
+                  <h3 className="text-sm font-bold text-slate-800">Cài đặt thông báo</h3>
+                  <p className="text-xs text-slate-500 font-medium">Quản lý cách bạn nhận thông báo</p>
+                </div>
+              </div>
+            </button>
+            <NotificationSettingsPanel />
+          </div>
         )}
 
         {/* View mode */}
