@@ -9,7 +9,8 @@ import {
   useUnfriend, 
   useUnrequest, 
   useAcceptRequest, 
-  useRejectRequest 
+  useRejectRequest,
+  useUnblockUser
 } from '../hooks/useFriends';
 import { useCreateConversation } from '../features/chat/hooks/useChat';
 import type { User } from '../types/friend';
@@ -20,6 +21,7 @@ export const UserProfilePage: React.FC = () => {
   
   const { mutate: sendRequest, isPending: isSendingRequest } = useSendRequest();
   const { mutate: blockUser, isPending: isBlocking } = useBlockUser();
+  const { mutate: unblockUser, isPending: isUnblocking } = useUnblockUser();
   const { mutate: unfriend, isPending: isUnfriending } = useUnfriend();
   const { mutate: unrequest, isPending: isUnrequesting } = useUnrequest();
   const { mutate: acceptRequest, isPending: isAccepting } = useAcceptRequest();
@@ -144,7 +146,20 @@ export const UserProfilePage: React.FC = () => {
             <div className="flex flex-wrap items-center gap-2">
               
               {/* Friendship Button State */}
-              {userProfile.friendshipStatus === 'ACCEPTED' ? (
+              {userProfile.friendshipStatus === 'BLOCKED' ? (
+                <button
+                  onClick={() => unblockUser(userProfile.id)}
+                  disabled={isUnblocking}
+                  className="btn-danger flex items-center gap-1"
+                >
+                  {isUnblocking ? (
+                    <Loader2 size={15} className="animate-spin" />
+                  ) : (
+                    <Ban size={15} />
+                  )}
+                  Bỏ chặn
+                </button>
+              ) : userProfile.friendshipStatus === 'ACCEPTED' ? (
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-emerald-700 bg-emerald-50 rounded-lg border border-emerald-200 select-none">
                     <UserCheck size={15} className="text-emerald-500" />
@@ -229,18 +244,20 @@ export const UserProfilePage: React.FC = () => {
               </button>
 
               {/* Block Button */}
-              <button
-                onClick={() => {
-                  if (window.confirm(`Bạn có chắc muốn chặn ${userProfile.name}?`)) {
-                    blockUser(userProfile.id);
-                  }
-                }}
-                disabled={isBlocking}
-                className="btn-danger !px-3"
-                title="Chặn người dùng"
-              >
-                <Ban size={15} />
-              </button>
+              {userProfile.friendshipStatus !== 'BLOCKED' && (
+                <button
+                  onClick={() => {
+                    if (window.confirm(`Bạn có chắc muốn chặn ${userProfile.name}?`)) {
+                      blockUser(userProfile.id);
+                    }
+                  }}
+                  disabled={isBlocking}
+                  className="btn-danger !px-3"
+                  title="Chặn người dùng"
+                >
+                  <Ban size={15} />
+                </button>
+              )}
 
               {/* Report Button */}
               <button

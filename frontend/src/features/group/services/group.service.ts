@@ -1,5 +1,6 @@
 import axiosInstance from '../../../services/axiosInstance';
 import type { ApiResponse } from '../../../types';
+import { useQuery } from '@tanstack/react-query';
 
 // ============================================================
 // Types
@@ -194,3 +195,18 @@ export const transferOwnerApi = (groupId: string, newOwnerId: string) =>
   axiosInstance.patch<ApiResponse<null>>(`/groups/${groupId}/transfer-owner`, {
     newOwnerId,
   });
+
+// ============================================================
+// React Query Hooks
+// ============================================================
+
+export const useGroupInvitations = () => {
+  return useQuery({
+    queryKey: ['group-invitations'],
+    queryFn: async () => {
+      const res = await getReceivedInvitationsApi();
+      return (res.data?.data ?? []).filter((inv) => inv.status === 'PENDING');
+    },
+    staleTime: 30_000,
+  });
+};

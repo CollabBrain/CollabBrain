@@ -2,6 +2,7 @@ import {
   useQuery,
   useMutation,
   useInfiniteQuery,
+  useQueryClient,
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { getSocket } from '../../../socket/socket';
@@ -326,6 +327,7 @@ export const useChatSocket = () => {
   const setTyping = useChatStore((s) => s.setTyping);
   const setOnlineStatus = useChatStore((s) => s.setOnlineStatus);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const queryClient = useQueryClient();
 
   const conversationsRef = useRef(useChatStore.getState().conversations);
   useEffect(() => {
@@ -353,9 +355,11 @@ export const useChatSocket = () => {
           updatedAt: message.createdAt,
           unreadCount: isFromMe ? conv.unreadCount : conv.unreadCount + 1,
         });
+      } else {
+        queryClient.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
       }
     },
-    [addMessage, addOrUpdate, accessToken]
+    [addMessage, addOrUpdate, accessToken, queryClient]
   );
 
   const handleTyping = useCallback(

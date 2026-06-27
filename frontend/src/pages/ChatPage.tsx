@@ -92,8 +92,7 @@ const ChatPage = () => {
     })();
   }, [accessToken]);
 
-  // Register all chat socket events (handles initial_online, typing, new_message, recall, pin, etc.)
-  useChatSocket();
+  // Chat socket events are now handled globally in MainLayout.tsx to ensure real-time badges updates across all pages.
 
   // Switch mobile view when conversation is selected
   useEffect(() => {

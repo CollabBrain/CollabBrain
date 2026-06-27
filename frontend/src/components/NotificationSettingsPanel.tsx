@@ -1,4 +1,4 @@
-import { useNotificationSettings, useUpdateNotificationSettings, type NotificationSettings } from '../../hooks/useNotificationSettings';
+import { useNotificationSettings, useUpdateNotificationSettings, type NotificationSettings } from '../hooks/useNotificationSettings';
 import { Bell, MessageCircle, UserPlus, Users, Settings as SettingsIcon, Volume2, Vibrate, Star } from 'lucide-react';
 
 export const NotificationSettingsPanel = () => {

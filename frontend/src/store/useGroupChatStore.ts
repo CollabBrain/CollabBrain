@@ -20,6 +20,10 @@ interface GroupChatState {
   // Loading state
   loadingMessages: Record<string, boolean>;
 
+  // Unread group messages state
+  unreadCounts: Record<string, number>;
+  totalUnreadCount: number;
+
   // ——— Actions ———
   setMessages: (groupId: string, messages: GroupMessage[]) => void;
   prependMessages: (groupId: string, messages: GroupMessage[]) => void;
@@ -37,6 +41,9 @@ interface GroupChatState {
   incrementPage: (groupId: string) => void;
   resetMessages: (groupId: string) => void;
   setLoading: (groupId: string, loading: boolean) => void;
+
+  incrementUnread: (groupId: string) => void;
+  clearUnread: (groupId: string) => void;
 }
 
 export const useGroupChatStore = create<GroupChatState>((set) => ({
@@ -47,6 +54,8 @@ export const useGroupChatStore = create<GroupChatState>((set) => ({
   messagePage: {},
   hasMoreMessages: {},
   loadingMessages: {},
+  unreadCounts: {},
+  totalUnreadCount: 0,
 
   setMessages: (groupId, messages) =>
     set((state) => ({
@@ -171,6 +180,25 @@ export const useGroupChatStore = create<GroupChatState>((set) => ({
     set((state) => ({
       loadingMessages: { ...state.loadingMessages, [groupId]: loading },
     })),
+
+  incrementUnread: (groupId) =>
+    set((state) => {
+      const current = state.unreadCounts[groupId] || 0;
+      const updated = { ...state.unreadCounts, [groupId]: current + 1 };
+      return {
+        unreadCounts: updated,
+        totalUnreadCount: Object.values(updated).reduce((a, b) => a + b, 0),
+      };
+    }),
+
+  clearUnread: (groupId) =>
+    set((state) => {
+      const updated = { ...state.unreadCounts, [groupId]: 0 };
+      return {
+        unreadCounts: updated,
+        totalUnreadCount: Object.values(updated).reduce((a, b) => a + b, 0),
+      };
+    }),
 }));
 
 // ——— Selectors ———
