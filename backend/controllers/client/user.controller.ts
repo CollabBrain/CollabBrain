@@ -194,7 +194,8 @@ export const updateStatus = async (req: Request, res: Response) => {
 export const refreshTokenPost = async (req: Request, res: Response) => {
 
   try {
-    const refreshToken = req.cookies.refreshToken;
+    // Accept refreshToken from body (frontend) or cookie (other clients)
+    const refreshToken = req.body?.refreshToken || req.cookies?.refreshToken;
     if (!refreshToken) {
       return res.status(401).json({
         code: 401,

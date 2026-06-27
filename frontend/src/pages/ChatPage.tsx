@@ -507,22 +507,9 @@ const AIAssistantWindow = ({ currentUserId, onBackMobile }: { currentUserId: str
       
       let responseText = answerData.answer;
       if (answerData.sources && answerData.sources.length > 0) {
-        const uniqueDocs = Array.from(new Set(answerData.sources.map(s => s.documentName)));
-        responseText += `\n\n**Nguồn tham khảo:**\n` + uniqueDocs.map(doc => `* 📎 ${doc}`).join('\n');
-      const lower = text.toLowerCase();
-      if (lower.includes('hello') || lower.includes('hi') || lower.includes('xin chào')) {
-        reply = `Xin chào ${profile?.name || 'bạn'}! Tôi là Trợ lý học tập AI của ${webName}. Hôm nay tôi có thể hỗ trợ gì cho bạn? Bạn có thể gửi tài liệu học tập hoặc đặt bất cứ câu hỏi nào cho tôi.`;
-      } else if (lower.includes('quiz') || lower.includes('trắc nghiệm') || lower.includes('kiểm tra')) {
-        reply = `Tuyệt vời! Chúng ta hãy làm một câu hỏi trắc nghiệm Sinh học nhanh nhé:
-
-**Sự khác biệt chính về kết quả tế bào giữa Nguyên phân (Mitosis) và Giảm phân (Meiosis) là gì?**
-* **A)** Nguyên phân tạo 4 tế bào độc nhất, Giảm phân tạo 2 tế bào giống hệt.
-* **B)** Nguyên phân tạo 2 tế bào lưỡng bội (diploid) giống hệt nhau, Giảm phân tạo 4 tế bào giao tử đơn bội (haploid) độc nhất.
-* **C)** Nguyên phân chỉ xảy ra ở thực vật, Giảm phân chỉ xảy ra ở động vật.
-
-*Nhập đáp án A, B hoặc C của bạn bên dưới nhé!*`;
+        const uniqueDocs = Array.from(new Set(answerData.sources.map((s: any) => s.documentName)));
+        responseText += `\n\n**Nguồn tham khảo:**\n` + uniqueDocs.map((doc: string) => `* 📎 ${doc}`).join('\n');
       }
-
       setMessages((prev) => [
         ...prev,
         {

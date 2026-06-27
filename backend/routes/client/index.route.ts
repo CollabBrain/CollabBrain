@@ -8,6 +8,7 @@ import { reportRoutes } from "./report.route";
 import { documentRoutes } from "./document.route";
 import { flashcardRoutes } from "./flashcard.route";
 import { ragRoutes } from "./rag.route";
+import { notificationRoutes } from "./notification.route";
 import { settingRoutes } from "./setting.route";
 import { todoRoutes } from "./todo.route";
 
@@ -28,6 +29,8 @@ app.use("/documents", documentRoutes)
 app.use("/user/documents", documentRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
 app.use("/flashcard", flashcardRoutes)
 app.use("/user/flashcard", flashcardRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
+app.use("/notifications", notificationRoutes)
+app.use("/user/notifications", notificationRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
 app.use("/rag", ragRoutes)
 app.use("/user/rag", ragRoutes) // Hỗ trợ frontend axiosInstance baseURL prefix /user
 app.use("/settings", settingRoutes)

@@ -50,6 +50,7 @@ model User {
   deckShares         DeckShare[]
   reviews            Review[]
   todos              Todo[]
+  notificationSettings UserNotificationSettings?
   @@map("users")
 }
 
@@ -248,6 +249,25 @@ model Todo {
 
   @@index([userId, createdAt])
   @@map("todos")
+}
+
+model UserNotificationSettings {
+  id              String   @id @default(uuid())
+  userId          String   @unique @map("user_id")
+  enableAll       Boolean  @default(true) @map("enable_all")
+  enableChat      Boolean  @default(true) @map("enable_chat")
+  enableFriend    Boolean  @default(true) @map("enable_friend")
+  enableGroup     Boolean  @default(true) @map("enable_group")
+  enableSystem    Boolean  @default(true) @map("enable_system")
+  enableSound     Boolean  @default(true) @map("enable_sound")
+  enableVibrate   Boolean  @default(true) @map("enable_vibrate")
+  chatPriority    String   @default("HIGH") @map("chat_priority")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_notification_settings")
 }
 
 // ============================================================
