@@ -51,7 +51,8 @@ export const myGroupGet = async (req: Request, res: Response) => {
 export const findGroupGet = async (req: Request, res: Response) => {
   try {
     const keyword = req.query.keyword as string || ""
-    const result = await findGroupGetService(keyword)
+    const myId = (req as any).user.id
+    const result = await findGroupGetService(keyword, myId)
     res.status(200).json({
       code: 200,
       message: result.message,
@@ -413,3 +414,40 @@ export const transferOwnerPatch = async (req: Request, res: Response) => {
     })
   }
 }
+
+//[DELETE] /groups/:groupId/join-request — Hủy yêu cầu tham gia nhóm
+export const cancelJoinRequestDelete = async (req: Request, res: Response) => {
+  try {
+    const groupId = req.params.groupId as string;
+    const myId = (req as any).user.id;
+    
+    // Tìm invitation type REQUEST, status PENDING
+    const invitation = await prisma.groupInvitation.findFirst({
+      where: {
+        groupId,
+        userId: myId,
+        type: "REQUEST",
+        status: "PENDING"
+      }
+    });
+
+    if (!invitation) {
+      return res.status(404).json({ code: 404, message: "Không tìm thấy yêu cầu tham gia đang chờ" });
+    }
+
+    await prisma.groupInvitation.delete({
+      where: {
+        id: invitation.id
+      }
+    });
+
+    res.status(200).json({
+      code: 200,
+      message: "Hủy yêu cầu tham gia thành công"
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      message: `Lỗi: ${error.message}`
+    });
+  }
+};

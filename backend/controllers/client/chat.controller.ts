@@ -77,7 +77,11 @@ export const uploadFilePost = async (req: Request, res: Response) => {
   try {
     const myId = (req as any).user.id;
     const pathUpload = `chat/${myId}`;
-    const result = await uploadToSupabasePostService(req.file!, pathUpload);
+    const file = req.file;
+    if (file) {
+      file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    }
+    const result = await uploadToSupabasePostService(file!, pathUpload);
     res.status(200).json({
       code: 200,
       data: result.data,
@@ -659,7 +663,11 @@ export const uploadGroupChatFile = async (req: Request, res: Response) => {
   try {
     const myId = (req as any).user.id;
     const groupId = req.params.groupId as string;
-    const result = await uploadGroupChatFileService(req.file!, groupId, myId);
+    const file = req.file;
+    if (file) {
+      file.originalname = Buffer.from(file.originalname, 'latin1').toString('utf8');
+    }
+    const result = await uploadGroupChatFileService(file!, groupId, myId);
     return res.status(200).json({ code: 200, message: result.message, data: result.data });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });

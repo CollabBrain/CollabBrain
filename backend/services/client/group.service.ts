@@ -1,5 +1,6 @@
 import { GroupRole } from "@prisma/client";
 import { findUserById } from "../../repositories/client/user.repo";
+import prisma from "../../config/prisma";
 import {
   addMemberGroup,
   changeOwner,
@@ -48,13 +49,25 @@ export const myGroupGetService = async (myId: string, keyword?: string) => {
   };
 };
 
-export const findGroupGetService = async (keyword: string) => {
-  const result = await findGroupByKeyword(keyword);
-  const formatted = result.map((g: any) => ({
-    ...g,
-    memberCount: g._count?.members || 0,
-    _count: undefined
-  }));
+export const findGroupGetService = async (keyword: string, myId: string) => {
+  const result = await findGroupByKeyword(keyword, myId);
+  const formatted = result.map((g: any) => {
+    let joinStatus = "none";
+    if (g.members && g.members.length > 0) {
+      joinStatus = "joined";
+    } else if (g.invitations && g.invitations.length > 0) {
+      joinStatus = g.invitations[0].type === "REQUEST" ? "pending" : "invited";
+    }
+    return {
+      ...g,
+      joinStatus,
+      myRole: g.members?.[0]?.role || null,
+      memberCount: g._count?.members || 0,
+      members: undefined,
+      invitations: undefined,
+      _count: undefined
+    };
+  });
   return {
     data: formatted,
     message: "Tim kiem thanh cong",
@@ -88,9 +101,16 @@ export const groupInfoGetService = async (groupId: string, myId: string) => {
 };
 
 export const memberGroupGetService = async (groupId: string, myId: string) => {
-  const isMember = await findGroupMember(groupId, myId);
-  if (!isMember) {
-    throw new Error("Không phải là thành viên nhóm, không thể xem");
+  const group = await prisma.group.findUnique({
+    where: { id: groupId }
+  });
+  if (!group || group.isDeleted) throw new Error("Nhóm không tồn tại");
+
+  if (group.visibility !== "PUBLIC") {
+    const isMember = await findGroupMember(groupId, myId);
+    if (!isMember) {
+      throw new Error("Không phải là thành viên nhóm, không thể xem");
+    }
   }
   const result = await getGroupMembers(groupId);
   return {

@@ -13,6 +13,7 @@ const RegisterPage = lazy(() => import('../pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/ForgotPasswordPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
+const SettingsPage = lazy(() => import('../pages/SettingsPage'));
 const ChatPage = lazy(() => import('../pages/ChatPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const LandingPage = lazy(() => import('../pages/LandingPage'));
@@ -120,6 +121,7 @@ export const AppRouter = () => {
         >
           <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+          <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
           <Route path={ROUTES.CHAT} element={<ChatPage />} />
           <Route path={ROUTES.DOCUMENTS} element={<DocumentsPage />} />
           <Route path={ROUTES.GROUPS} element={<GroupsPage />} />

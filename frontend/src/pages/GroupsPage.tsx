@@ -210,9 +210,15 @@ const CreateGroupModal = ({ onClose, onCreated }: CreateGroupModalProps) => {
 
 // ——— Discover Group Card
 const DiscoverGroupCard = ({ group, onJoined }: { group: GroupData; onJoined?: () => void }) => {
-  const [status, setStatus] = useState<'idle' | 'loading' | 'done'>('idle');
+  const [status, setStatus] = useState<'idle' | 'loading' | 'done'>(
+    group.joinStatus === 'pending' ? 'done' : 'idle'
+  );
   const coverColor = getCoverColor(group.id);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    setStatus(group.joinStatus === 'pending' ? 'done' : 'idle');
+  }, [group.joinStatus]);
 
   const handleJoin = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -265,7 +271,7 @@ const DiscoverGroupCard = ({ group, onJoined }: { group: GroupData; onJoined?: (
           {status === 'loading' 
             ? 'Đang xử lý...' 
             : status === 'done' 
-              ? 'Đã gửi yêu cầu'
+              ? 'Đang chờ duyệt'
               : 'Xin tham gia'}
         </button>
       </div>
@@ -312,7 +318,7 @@ const InvitationCard = ({ inv, onAccepted, onRejected }: {
         </div>
         <div className="min-w-0">
           <p className="text-xs font-extrabold text-slate-800 truncate">{inv.group.name}</p>
-          <p className="text-[10px] text-slate-400">Được mời bởi {inv.invitedBy?.name || 'Ai đó'}</p>
+          <p className="text-[10px] text-slate-400">Được mời bởi {inv.sender?.name || 'Ai đó'}</p>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -636,18 +642,21 @@ const GroupsPage = () => {
                 />
               </div>
 
-              {/* Banner AI gợi ý */}
-              <div className="bg-gradient-to-r from-indigo-600 to-violet-600 rounded-2xl p-5 text-white flex items-center gap-4">
-                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
-                  <Sparkles className="w-5 h-5 text-white" />
+              {/* Nhóm theo chủ đề */}
+              <div className="bg-white rounded-2xl border border-slate-100 p-4 space-y-3">
+                <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Theo môn học</h3>
+                <div className="flex flex-wrap gap-2">
+                  {['Toán', 'Lý', 'Hóa', 'Văn', 'Anh', 'Lập trình', 'AI/ML', 'Thiết kế', 'Kinh tế'].map(subject => (
+                    <button
+                      key={subject}
+                      onClick={() => setDiscoverKeyword(subject)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all cursor-pointer"
+                    >
+                      <BookOpen className="w-3 h-3" />
+                      {subject}
+                    </button>
+                  ))}
                 </div>
-                <div>
-                  <p className="text-sm font-extrabold">AI gợi ý nhóm học tập</p>
-                  <p className="text-xs text-white/80 mt-0.5">Dựa trên môn học và tiến độ học tập của bạn</p>
-                </div>
-                <button className="ml-auto shrink-0 px-4 py-2 bg-white text-indigo-600 text-xs font-bold rounded-xl hover:bg-indigo-50 transition-all border-0 cursor-pointer">
-                  Xem gợi ý
-                </button>
               </div>
 
               {/* Danh sách nhóm discover */}
@@ -680,23 +689,6 @@ const GroupsPage = () => {
                     </div>
                   );
                 })()}
-              </div>
-
-              {/* Nhóm theo chủ đề */}
-              <div>
-                <h2 className="text-base font-extrabold text-slate-800 mb-3">Theo môn học</h2>
-                <div className="flex flex-wrap gap-2">
-                  {['Toán', 'Lý', 'Hóa', 'Văn', 'Anh', 'Lập trình', 'AI/ML', 'Thiết kế', 'Kinh tế'].map(subject => (
-                    <button
-                      key={subject}
-                      onClick={() => setDiscoverKeyword(subject)}
-                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-bold text-slate-600 bg-white border border-slate-200 hover:border-indigo-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all cursor-pointer"
-                    >
-                      <BookOpen className="w-3 h-3" />
-                      {subject}
-                    </button>
-                  ))}
-                </div>
               </div>
             </div>
           )}

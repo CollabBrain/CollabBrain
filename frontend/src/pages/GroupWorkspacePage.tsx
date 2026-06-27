@@ -28,6 +28,7 @@ import {
   inviteMemberApi,
   updateGroupApi,
   deleteGroupApi,
+  cancelJoinRequestApi,
 } from '../features/group/services/group.service';
 import type {
   GroupWithRole,
@@ -369,7 +370,8 @@ const DocumentsTab = ({ group, isMember, canContribute, isOwner }: { group: Grou
   const [uploadProgress, setUploadProgress] = useState(0);
 
   const fetchDocuments = useCallback(async () => {
-    if (!group.id || !isMember) return;
+    // Cho phép xem tài liệu nếu là thành viên hoặc nhóm công khai
+    if (!group.id || (!isMember && group.visibility !== 'PUBLIC')) return;
     setLoading(true);
     try {
       const res = await getGroupDocumentsApi(group.id, {
@@ -733,7 +735,7 @@ const SettingsTab = ({
   };
 
   return (
-    <div className="space-y-5 max-w-2xl">
+    <div className="space-y-5 max-w-2xl mx-auto">
       {/* Thông tin nhóm */}
       <div className="bg-white border border-slate-100 rounded-2xl overflow-hidden">
         <div className="px-6 py-4 border-b border-slate-50">
@@ -1051,10 +1053,11 @@ const GroupWorkspacePage = () => {
 
   useEffect(() => { fetchGroup(); }, [fetchGroup]);
   useEffect(() => {
-    if (isMember) {
+    // Lấy danh sách thành viên: cho phép nếu là thành viên hoặc nhóm công khai
+    if (isMember || group?.visibility === 'PUBLIC') {
       fetchMembers();
     }
-  }, [isMember, fetchMembers]);
+  }, [isMember, group?.visibility, fetchMembers]);
   useEffect(() => {
     if (isOwner) fetchJoinRequests();
   }, [isOwner, fetchJoinRequests]);
@@ -1270,7 +1273,19 @@ const GroupWorkspacePage = () => {
                       <div className="fixed inset-0 z-20" onClick={() => setOpenPendingDropdown(false)} />
                       <div className="absolute right-0 top-11 z-30 w-48 bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden p-1.5">
                         <button
-                          onClick={() => { setOpenPendingDropdown(false); /* cancel request */ }}
+                          onClick={async () => {
+                            setOpenPendingDropdown(false);
+                            if (!groupId) return;
+                            setJoinLoading(true);
+                            try {
+                              await cancelJoinRequestApi(groupId);
+                              await fetchGroup();
+                            } catch {
+                              // silent
+                            } finally {
+                              setJoinLoading(false);
+                            }
+                          }}
                           className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-rose-600 hover:bg-rose-50 rounded-xl border-0 cursor-pointer transition-all text-left"
                         >
                           <X className="w-3.5 h-3.5" />

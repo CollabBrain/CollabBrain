@@ -2,7 +2,7 @@ import { GroupInvitation, GroupRole, InvitationStatus, InvitationType } from "@p
 import prisma from "../../config/prisma"
 import { groupTypeData } from "../../types/client/group.types"
 
-export const findGroupByKeyword = async (keyword: string) => {
+export const findGroupByKeyword = async (keyword: string, myId: string) => {
   return prisma.group.findMany({
     where: {
       OR: [
@@ -18,6 +18,14 @@ export const findGroupByKeyword = async (keyword: string) => {
     include: {
       _count: {
         select: { members: true }
+      },
+      members: {
+        where: { userId: myId },
+        select: { role: true }
+      },
+      invitations: {
+        where: { userId: myId, status: "PENDING" },
+        select: { type: true, status: true }
       }
     }
   })
@@ -306,7 +314,13 @@ export const getListInviteReceived = async(userId:string)=>{
           name: true,
           description: true,
         }
-
+      },
+      sender: {
+        select: {
+          id: true,
+          name: true,
+          avatarUrl: true
+        }
       }
     }
   })

@@ -27,6 +27,7 @@ router.post("/:groupId/leave", ratelimit.authIpLimiter,middleware.authMiddleware
 
 
 router.post("/:groupId/join-request",ratelimit.authIpLimiter,middleware.authMiddleware,controller.joinRequestPost)
+router.delete("/:groupId/join-request",ratelimit.authIpLimiter,middleware.authMiddleware,controller.cancelJoinRequestDelete)
 router.get("/:groupId/join-requests",ratelimit.authIpLimiter,middleware.authMiddleware,controller.listRequestGet)
 
 router.patch("/:groupId/join-requests/:invitationId/accept",ratelimit.authIpLimiter,middleware.authMiddleware,controller.acceptMemberPatch)

@@ -1,14 +1,14 @@
 import { useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useProfile, useEditProfile, useUpdateStatus } from '../features/profile/hooks/useProfile';
 import FormInput from '../components/common/FormInput';
 import LoadingButton from '../components/common/LoadingButton';
 import { Button } from '../components/ui/button';
-import { Pencil, Calendar, Mail, User as UserIcon, Camera, Loader2, CheckCircle, AlertCircle, Smile, Clock, Bell } from 'lucide-react';
+import { Pencil, Calendar, Mail, User as UserIcon, Camera, Loader2, CheckCircle, AlertCircle, Smile, Clock, Bell, Users, Layers, BookOpen } from 'lucide-react';
 import AvatarUpload from '../components/common/AvatarUpload';
 import RichTextEditor from '../components/common/RichTextEditor';
 import axiosInstance from '../services/axiosInstance';
 import { useAuthStore } from '../store/useAuthStore';
-import { NotificationSettingsPanel } from '../components/NotificationSettingsPanel';
 
 // ——— Quick status presets ———
 const STATUS_PRESETS = [
@@ -135,6 +135,7 @@ const StatusEditor = ({
 
 // ——— Main ProfilePage ———
 const ProfilePage = () => {
+  const navigate = useNavigate();
   const { data: user, isLoading, isError } = useProfile();
   const editMutation = useEditProfile();
   const statusMutation = useUpdateStatus();
@@ -145,6 +146,7 @@ const ProfilePage = () => {
   const [form, setForm] = useState({ name: '', bio: '', avatarUrl: '', coverUrl: '' });
   const [errors, setErrors] = useState<{ name?: string }>({});
   const [successMsg, setSuccessMsg] = useState('');
+  const [showAllGroups, setShowAllGroups] = useState(false);
 
   const coverFileInputRef = useRef<HTMLInputElement>(null);
   const [isUploadingCover, setIsUploadingCover] = useState(false);
@@ -289,9 +291,16 @@ const ProfilePage = () => {
             {/* Info */}
             <div className="flex-1 min-w-0 pt-3 sm:pt-4 pb-3">
               <h1 className="text-2xl md:text-3xl font-black text-slate-900 leading-tight">{user.name}</h1>
-              <p className="text-sm text-slate-500 mt-1 flex items-center gap-1.5">
-                <Mail className="w-4 h-4" /> {user.email}
-              </p>
+              <div className="flex flex-wrap items-center gap-3 mt-1.5 text-sm text-slate-500">
+                <span className="flex items-center gap-1.5 font-semibold text-slate-700">
+                  <Users className="w-4 h-4 text-indigo-500" />
+                  {user.friendsCount || 0} bạn bè
+                </span>
+                <span className="text-slate-300">•</span>
+                <span className="flex items-center gap-1.5">
+                  <Mail className="w-4 h-4" /> {user.email}
+                </span>
+              </div>
               {/* Status Badge */}
               <StatusBadge status={user.status} statusExpiresAt={user.statusExpiresAt} />
             </div>
@@ -341,27 +350,7 @@ const ProfilePage = () => {
           />
         )}
 
-        {/* Notification Settings - only show when authenticated */}
-        {isAuthenticated && (
-          <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
-            <button
-              type="button"
-              onClick={() => setShowStatusEditor(false)}
-              className="w-full"
-            >
-              <div className="flex items-center gap-3 mb-4">
-                <div className="p-2.5 rounded-xl bg-indigo-50 text-indigo-600">
-                  <Bell className="h-5 w-5" />
-                </div>
-                <div className="text-left">
-                  <h3 className="text-sm font-bold text-slate-800">Cài đặt thông báo</h3>
-                  <p className="text-xs text-slate-500 font-medium">Quản lý cách bạn nhận thông báo</p>
-                </div>
-              </div>
-            </button>
-            <NotificationSettingsPanel />
-          </div>
-        )}
+
 
         {/* View mode */}
         {!isEditing ? (
@@ -380,9 +369,41 @@ const ProfilePage = () => {
                   </div>
                 )}
               </div>
+
+              {/* Public Flashcards */}
+              <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+                  <Layers className="h-4 w-4 text-indigo-500" />
+                  Thẻ Flashcard công khai ({user.publicDecks?.length || 0})
+                </h3>
+                {user.publicDecks && user.publicDecks.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {user.publicDecks.map(deck => (
+                      <div 
+                        key={deck.id}
+                        onClick={() => navigate(`/flashcard/decks/${deck.id}`)}
+                        className="p-4 rounded-xl border border-slate-100 hover:border-indigo-100 hover:bg-slate-50/50 cursor-pointer transition-all duration-200 flex items-center gap-3"
+                      >
+                        <div className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold shrink-0 shadow-sm" style={{ backgroundColor: deck.color || '#4F46E5' }}>
+                          <BookOpen className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-sm font-bold text-slate-800 truncate">{deck.name}</h4>
+                          <p className="text-xs text-slate-400 font-semibold mt-0.5">{deck._count?.cards || 0} thẻ</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-sm text-slate-400 italic text-center py-6 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                    Chưa có bộ thẻ flashcard công khai nào.
+                  </div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-6">
+              {/* Card 1: Thông tin thêm */}
               <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
                 <h3 className="text-sm font-bold text-slate-800 mb-4">Thông tin thêm</h3>
                 <div className="space-y-4">
@@ -401,6 +422,55 @@ const ProfilePage = () => {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Card 2: Nhóm học tập đã tham gia */}
+              <div className="bg-white border border-slate-100 rounded-2xl p-6 shadow-sm">
+                <h3 className="text-sm font-bold text-slate-800 flex items-center gap-2 mb-4">
+                  <Users className="h-4 w-4 text-indigo-500" />
+                  Nhóm học tập đã tham gia ({user.joinedGroups?.length || 0})
+                </h3>
+                {user.joinedGroups && user.joinedGroups.length > 0 ? (
+                  <div className="space-y-3">
+                    {(showAllGroups ? user.joinedGroups : user.joinedGroups.slice(0, 3)).map(group => (
+                      <div 
+                        key={group.id}
+                        onClick={() => navigate(`/groups/${group.id}`)}
+                        className="p-3 rounded-xl border border-slate-50 hover:border-indigo-50 hover:bg-slate-50/50 cursor-pointer transition-all duration-200 flex items-center gap-3"
+                      >
+                        {group.avatarUrl ? (
+                          <img src={group.avatarUrl} alt={group.name} className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                        ) : (
+                          <div className="w-9 h-9 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center font-bold text-xs shrink-0">
+                            {group.name.slice(0, 2).toUpperCase()}
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <h4 className="text-xs font-bold text-slate-800 truncate">{group.name}</h4>
+                          <div className="flex items-center gap-1 text-[10px] text-slate-400 font-semibold mt-0.5">
+                            <span>{group._count?.members || 0} thành viên</span>
+                            <span>•</span>
+                            <span className="capitalize">{group.visibility.toLowerCase()}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {user.joinedGroups.length > 3 && (
+                      <button 
+                        type="button"
+                        onClick={() => setShowAllGroups(prev => !prev)}
+                        className="w-full text-center py-2 text-xs font-bold text-indigo-600 hover:text-indigo-700 bg-slate-50 hover:bg-indigo-50/30 rounded-xl transition-all border-0 cursor-pointer"
+                      >
+                        {showAllGroups ? 'Thu gọn' : 'Xem thêm'}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-xs text-slate-400 italic text-center py-4 bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                    Chưa tham gia nhóm học tập nào.
+                  </div>
+                )}
               </div>
             </div>
           </div>

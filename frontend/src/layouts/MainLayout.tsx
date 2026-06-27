@@ -141,7 +141,7 @@ const SidebarContent = memo(({
         <div className="flex items-center justify-between px-2">
           <NotificationBell />
           <Link
-            to={ROUTES.PROFILE}
+            to={ROUTES.SETTINGS}
             title="Settings"
             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
           >
