@@ -11,7 +11,8 @@ export const createDeck = async (
   description?: string,
   color?: string,
   icon?: string,
-  groupId?: string
+  groupId?: string,
+  isPublic?: boolean
 ) => {
   return prisma.deck.create({
     data: {
@@ -20,6 +21,7 @@ export const createDeck = async (
       color: color || "#3B82F6",
       icon,
       groupId,
+      isPublic: isPublic ?? false,
       createdBy: userId
     },
     include: {

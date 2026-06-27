@@ -134,26 +134,95 @@ export const resetPasswordPost = async (req: Request, res: Response) => {
     })
   }
 }
-export const userProfile = (req: Request, res: Response) => {
+export const userProfile = async (req: Request, res: Response) => {
   try {
-    const user = (req as any).user
+    const user = (req as any).user;
+    
+    // Count accepted friendships
+    const friendsCount = await prisma.friendship.count({
+      where: {
+        OR: [
+          { senderId: user.id },
+          { receiverId: user.id }
+        ],
+        status: "ACCEPTED"
+      }
+    });
+
+    // Public decks (flashcards)
+    const publicDecks = await prisma.deck.findMany({
+      where: {
+        createdBy: user.id,
+        isPublic: true,
+        isDeleted: false
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        color: true,
+        icon: true,
+        createdAt: true,
+        _count: {
+          select: { cards: true }
+        }
+      }
+    });
+
+    // Joined groups (for current user, all groups they joined)
+    const joinedGroups = await prisma.groupMember.findMany({
+      where: {
+        userId: user.id,
+        group: {
+          isDeleted: false,
+          isActive: true
+        }
+      },
+      select: {
+        role: true,
+        group: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            avatarUrl: true,
+            coverUrl: true,
+            visibility: true,
+            _count: {
+              select: { members: true }
+            }
+          }
+        }
+      }
+    });
+
     // ẩn status nếu đã hết hạn
     const now = new Date();
     const effectiveStatus = user.statusExpiresAt && new Date(user.statusExpiresAt) > now
       ? user.status
       : null;
+
     res.status(200).json({
-      data: { ...user, status: effectiveStatus },
+      data: { 
+        ...user, 
+        status: effectiveStatus,
+        friendsCount,
+        publicDecks,
+        joinedGroups: joinedGroups.map(gm => ({
+          ...gm.group,
+          role: gm.role
+        }))
+      },
       message: "Lấy thông tin profile thành công",
       code: 200
-    })
+    });
   } catch (error: any) {
     res.status(400).json({
       code: 400,
       message: error.message
-    })
+    });
   }
-}
+};
 
 export const editProfile = async (req: Request, res: Response) => {
   try {
@@ -254,6 +323,8 @@ export const userProfileById = async (req: Request, res: Response) => {
         avatarUrl: true,
         coverUrl: true,
         bio: true,
+        status: true,
+        statusExpiresAt: true,
         createdAt: true,
       },
     });
@@ -264,6 +335,71 @@ export const userProfileById = async (req: Request, res: Response) => {
         message: "Không tìm thấy người dùng",
       });
     }
+
+    // Count accepted friendships
+    const friendsCount = await prisma.friendship.count({
+      where: {
+        OR: [
+          { senderId: user.id },
+          { receiverId: user.id }
+        ],
+        status: "ACCEPTED"
+      }
+    });
+
+    // Public decks (flashcards)
+    const publicDecks = await prisma.deck.findMany({
+      where: {
+        createdBy: user.id,
+        isPublic: true,
+        isDeleted: false
+      },
+      select: {
+        id: true,
+        name: true,
+        description: true,
+        color: true,
+        icon: true,
+        createdAt: true,
+        _count: {
+          select: { cards: true }
+        }
+      }
+    });
+
+    // Joined public groups only
+    const joinedGroups = await prisma.groupMember.findMany({
+      where: {
+        userId: user.id,
+        group: {
+          visibility: "PUBLIC",
+          isDeleted: false,
+          isActive: true
+        }
+      },
+      select: {
+        role: true,
+        group: {
+          select: {
+            id: true,
+            name: true,
+            description: true,
+            avatarUrl: true,
+            coverUrl: true,
+            visibility: true,
+            _count: {
+              select: { members: true }
+            }
+          }
+        }
+      }
+    });
+
+    // Hide status if expired
+    const now = new Date();
+    const effectiveStatus = user.statusExpiresAt && new Date(user.statusExpiresAt) > now
+      ? user.status
+      : null;
 
     const currentUser = (req as any).user;
     let friendshipStatus: string | null = null;
@@ -289,6 +425,13 @@ export const userProfileById = async (req: Request, res: Response) => {
       code: 200,
       data: {
         ...user,
+        status: effectiveStatus,
+        friendsCount,
+        publicDecks,
+        joinedGroups: joinedGroups.map(gm => ({
+          ...gm.group,
+          role: gm.role
+        })),
         friendshipStatus,
         isSender,
       },

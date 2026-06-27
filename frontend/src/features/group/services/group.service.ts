@@ -60,6 +60,11 @@ export interface InvitationData {
     name: string;
     avatarUrl?: string;
   };
+  sender?: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  };
   status: InvitationStatus;
   createdAt: string;
 }

@@ -35,9 +35,9 @@ const str = (val: string | string[] | undefined): string => {
 export const createDeck = async (req: Request, res: Response) => {
   try {
     const userId = (req as any).user.id;
-    const { name, description, color, icon, groupId } = req.body;
+    const { name, description, color, icon, groupId, isPublic } = req.body;
 
-    const result = await createDeckService(userId, name, description, color, icon, groupId);
+    const result = await createDeckService(userId, name, description, color, icon, groupId, isPublic);
     return res.status(201).json({
       code: 201,
       message: result.message,

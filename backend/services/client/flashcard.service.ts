@@ -30,13 +30,14 @@ export const createDeckService = async (
   description?: string,
   color?: string,
   icon?: string,
-  groupId?: string
+  groupId?: string,
+  isPublic?: boolean
 ) => {
   if (!name || name.trim().length === 0) {
     throw new Error("Tên deck không được để trống");
   }
 
-  const deck = await createDeck(userId, name.trim(), description?.trim(), color, icon, groupId);
+  const deck = await createDeck(userId, name.trim(), description?.trim(), color, icon, groupId, isPublic);
   return {
     data: deck,
     message: "Tạo deck thành công"

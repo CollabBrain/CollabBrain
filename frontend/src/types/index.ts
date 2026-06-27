@@ -12,6 +12,26 @@ export interface User {
   isDeleted: boolean;
   createdAt: string;
   updatedAt: string;
+  friendsCount?: number;
+  publicDecks?: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    color: string;
+    icon: string | null;
+    createdAt: string;
+    _count: { cards: number };
+  }>;
+  joinedGroups?: Array<{
+    id: string;
+    name: string;
+    description: string | null;
+    avatarUrl: string | null;
+    coverUrl: string | null;
+    visibility: string;
+    _count: { members: number };
+    role: string;
+  }>;
 }
 
 // ========== Auth Payloads ==========
