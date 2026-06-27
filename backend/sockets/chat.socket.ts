@@ -300,13 +300,27 @@ export const chatSocket = (io: Server) => {
           (content && (content.includes("@AI Assistant") || content.includes("@AI")));
 
         if (hasBotMention) {
+          let seconds = 0;
+          let botStatus = "Đang kiểm tra tài liệu...";
+          
           // Gửi typing indicator của Bot ngay lập tức
           io.to(`group:${groupId}`).emit("group:typing", {
             groupId,
             userId: AI_BOT_ID,
-            userName: "AI Assistant",
+            userName: `AI Assistant (${botStatus} 0s)`,
             isTyping: true
           });
+
+          // Cập nhật đếm giây mỗi giây một lần
+          const typingInterval = setInterval(() => {
+            seconds += 1;
+            io.to(`group:${groupId}`).emit("group:typing", {
+              groupId,
+              userId: AI_BOT_ID,
+              userName: `AI Assistant (${botStatus} ${seconds}s)`,
+              isTyping: true
+            });
+          }, 1000);
 
           // Chạy RAG truy vấn tài liệu bất đồng bộ
           (async () => {
@@ -319,6 +333,32 @@ export const chatSocket = (io: Server) => {
               if (!question) {
                 question = "Xin chào! Bạn cần tôi giúp gì về tài liệu của nhóm?";
               }
+
+              // Kiểm tra và chờ các tài liệu đang phân tích trong nhóm (chỉ các định dạng văn bản hỗ trợ RAG)
+              const checkPendingDocs = async () => {
+                const pendingCount = await prisma.document.count({
+                  where: { 
+                    groupId, 
+                    isDeleted: false, 
+                    isEmbedded: false,
+                    type: { in: ["PDF", "DOCX", "PPTX", "XLSX"] }
+                  }
+                });
+                return pendingCount > 0;
+              };
+
+              let hasPending = await checkPendingDocs();
+              let checkCount = 0;
+              if (hasPending) {
+                botStatus = "Đang phân tích tài liệu...";
+                while (hasPending && checkCount < 10) { // Chờ tối đa 20 giây (10 * 2s)
+                  await new Promise((resolve) => setTimeout(resolve, 2000));
+                  hasPending = await checkPendingDocs();
+                  checkCount++;
+                }
+              }
+
+              botStatus = "Đang suy nghĩ...";
 
               // Gọi RAG Service truy vấn tài liệu thuộc nhóm
               const result = await queryRAGService(user.id, question, { groupId });
@@ -338,6 +378,9 @@ export const chatSocket = (io: Server) => {
                 "TEXT"
               );
 
+              // Xóa interval đếm giây
+              clearInterval(typingInterval);
+
               // Tắt typing indicator của Bot
               io.to(`group:${groupId}`).emit("group:typing", {
                 groupId,
@@ -354,6 +397,9 @@ export const chatSocket = (io: Server) => {
 
             } catch (err: any) {
               console.error("[Socket RAG Bot Error]", err);
+              // Xóa interval đếm giây
+              clearInterval(typingInterval);
+
               // Tắt typing indicator
               io.to(`group:${groupId}`).emit("group:typing", {
                 groupId,
