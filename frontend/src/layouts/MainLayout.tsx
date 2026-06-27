@@ -3,6 +3,7 @@ import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
 import { LayoutDashboard, MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, CheckSquare, Layers } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
+import { useChatStore } from '../store/useChatStore';
 import { ROUTES } from '../constants';
 import { cn } from '../lib/utils';
 import { CallOverlay } from '../features/chat/components/CallOverlay';
@@ -65,6 +66,8 @@ const SidebarContent = memo(({
         <nav className="flex flex-col gap-1.5">
           {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
             const active = isActive(to);
+            const isChat = to === ROUTES.CHAT;
+            const totalUnread = useChatStore((s) => s.totalUnreadCount);
             return (
               <Link
                 key={to}
@@ -79,6 +82,11 @@ const SidebarContent = memo(({
               >
                 <Icon className={cn('h-5 w-5', active ? 'text-indigo-600' : 'text-slate-400')} />
                 {label}
+                {isChat && totalUnread > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                    {totalUnread > 99 ? '99+' : totalUnread}
+                  </span>
+                )}
                 {active && (
                   <span className="absolute right-0.5 top-[25%] bottom-[25%] w-1.5 rounded-l bg-indigo-600" />
                 )}
