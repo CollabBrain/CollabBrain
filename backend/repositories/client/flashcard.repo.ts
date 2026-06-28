@@ -36,8 +36,28 @@ export const createDeck = async (
   });
 };
 
-export const getDeckById = async (deckId: string) => {
-  return prisma.deck.findFirst({
+// Helper: check if user has access to a deck
+const hasDeckAccess = async (deck: { id: string; createdBy: string; isPublic: boolean; groupId: string | null }, userId?: string) => {
+  if (!userId) return deck.isPublic;
+  if (deck.createdBy === userId) return true;
+  
+  const share = await prisma.deckShare.findFirst({
+    where: { deckId: deck.id, userId }
+  });
+  if (share) return true;
+  
+  if (deck.groupId) {
+    const member = await prisma.groupMember.findFirst({
+      where: { groupId: deck.groupId, userId }
+    });
+    if (member) return true;
+  }
+  
+  return false;
+};
+
+export const getDeckById = async (deckId: string, userId?: string) => {
+  const deck = await prisma.deck.findFirst({
     where: { id: deckId, isDeleted: false },
     include: {
       creator: {
@@ -52,6 +72,11 @@ export const getDeckById = async (deckId: string) => {
       }
     }
   });
+  
+  if (!deck) return null;
+  if (!(await hasDeckAccess(deck, userId))) return null;
+  
+  return deck;
 };
 
 export const getUserDecks = async (userId: string, page = 1, limit = 20) => {
@@ -237,7 +262,17 @@ export const createMultipleFlashcards = async (
   });
 };
 
-export const getFlashcardsByDeck = async (deckId: string, page = 1, limit = 50) => {
+export const getFlashcardsByDeck = async (deckId: string, page = 1, limit = 50, userId?: string) => {
+  // Check access
+  const deck = await prisma.deck.findFirst({
+    where: { id: deckId, isDeleted: false },
+    select: { id: true, createdBy: true, isPublic: true, groupId: true }
+  });
+  
+  if (!deck || !(await hasDeckAccess(deck, userId))) {
+    return { cards: [], total: 0, page, totalPages: 0 };
+  }
+  
   const skip = (page - 1) * limit;
 
   const [cards, total] = await Promise.all([
@@ -319,7 +354,17 @@ export const deleteFlashcard = async (cardId: string, userId: string) => {
 // ——— STUDY MODE (Spaced Repetition) ———
 // ============================================================
 
-export const getCardsForStudy = async (deckId: string, userId: string, limit = 20) => {
+export const getCardsForStudy = async (deckId: string, userId?: string, limit = 20) => {
+  // Check access
+  const deck = await prisma.deck.findFirst({
+    where: { id: deckId, isDeleted: false },
+    select: { id: true, createdBy: true, isPublic: true, groupId: true }
+  });
+  
+  if (!deck || !(await hasDeckAccess(deck, userId))) {
+    return [];
+  }
+  
   // Get cards that are due for review or new cards
   const cards = await prisma.flashcard.findMany({
     where: {
@@ -354,7 +399,17 @@ export const getCardsForStudy = async (deckId: string, userId: string, limit = 2
   return cards;
 };
 
-export const getStudyStats = async (deckId: string, userId: string) => {
+export const getStudyStats = async (deckId: string, userId?: string) => {
+  // Check access
+  const deck = await prisma.deck.findFirst({
+    where: { id: deckId, isDeleted: false },
+    select: { id: true, createdBy: true, isPublic: true, groupId: true }
+  });
+  
+  if (!deck || !(await hasDeckAccess(deck, userId))) {
+    return { totalCards: 0, dueCards: 0, newCards: 0, learnedCards: 0 };
+  }
+  
   const cards = await prisma.flashcard.findMany({
     where: { deckId, isDeleted: false },
     select: {

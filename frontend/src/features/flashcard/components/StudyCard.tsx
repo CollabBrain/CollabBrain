@@ -204,12 +204,7 @@ export const StudyCard = ({
         {/* Card Content */}
         <div className="flex-1 flex items-center justify-center p-6">
           <div className="text-center">
-            <p
-              className={cn(
-                "text-xl font-medium whitespace-pre-wrap",
-                !isFlipped && "blur-sm"
-              )}
-            >
+            <p className="text-xl font-medium whitespace-pre-wrap">
               {isFlipped ? currentCard.back : currentCard.front}
             </p>
 

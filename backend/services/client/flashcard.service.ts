@@ -44,9 +44,9 @@ export const createDeckService = async (
   };
 };
 
-export const getDeckByIdService = async (deckId: string) => {
-  const deck = await getDeckById(deckId);
-  if (!deck) throw new Error("Không tìm thấy deck");
+export const getDeckByIdService = async (deckId: string, userId?: string) => {
+  const deck = await getDeckById(deckId, userId);
+  if (!deck) throw new Error("Không tìm thấy deck hoặc bạn không có quyền truy cập");
 
   return {
     data: deck,
@@ -121,7 +121,9 @@ export const createFlashcardService = async (
   }
 ) => {
   if (!data.front?.trim()) throw new Error("Mặt trước không được để trống");
+  if (data.front.trim().length > 600) throw new Error("Mặt trước không được vượt quá 600 kí tự");
   if (!data.back?.trim()) throw new Error("Mặt sau không được để trống");
+  if (data.back.trim().length > 600) throw new Error("Mặt sau không được vượt quá 600 kí tự");
 
   const card = await createFlashcard(deckId, {
     front: data.front.trim(),
@@ -170,8 +172,8 @@ export const createMultipleFlashcardsService = async (
   };
 };
 
-export const getDeckCardsService = async (deckId: string, page = 1, limit = 50) => {
-  const result = await getFlashcardsByDeck(deckId, page, limit);
+export const getDeckCardsService = async (deckId: string, userId?: string, page = 1, limit = 50) => {
+  const result = await getFlashcardsByDeck(deckId, page, limit, userId);
   return {
     data: result,
     message: "Lấy danh sách thẻ thành công"
@@ -231,7 +233,7 @@ export const deleteFlashcardService = async (cardId: string, userId: string) => 
 // ——— STUDY MODE SERVICES ———
 // ============================================================
 
-export const getStudyCardsService = async (deckId: string, userId: string, limit = 20) => {
+export const getStudyCardsService = async (deckId: string, userId?: string, limit = 20) => {
   const [cards, stats] = await Promise.all([
     getCardsForStudy(deckId, userId, limit),
     getStudyStats(deckId, userId)
@@ -246,7 +248,7 @@ export const getStudyCardsService = async (deckId: string, userId: string, limit
   };
 };
 
-export const getDeckStatsService = async (deckId: string, userId: string) => {
+export const getDeckStatsService = async (deckId: string, userId?: string) => {
   const stats = await getStudyStats(deckId, userId);
   return {
     data: stats,
