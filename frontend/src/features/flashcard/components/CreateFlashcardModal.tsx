@@ -66,6 +66,7 @@ export const CreateFlashcardModal = ({
               onChange={(e) => setFront(e.target.value)}
               placeholder="Nhập câu hỏi..."
               rows={3}
+              maxLength={600}
               required
             />
           </div>
@@ -78,6 +79,7 @@ export const CreateFlashcardModal = ({
               onChange={(e) => setBack(e.target.value)}
               placeholder="Nhập đáp án..."
               rows={3}
+              maxLength={600}
               required
             />
           </div>

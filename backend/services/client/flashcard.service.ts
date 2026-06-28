@@ -121,7 +121,9 @@ export const createFlashcardService = async (
   }
 ) => {
   if (!data.front?.trim()) throw new Error("Mặt trước không được để trống");
+  if (data.front.trim().length > 600) throw new Error("Mặt trước không được vượt quá 600 kí tự");
   if (!data.back?.trim()) throw new Error("Mặt sau không được để trống");
+  if (data.back.trim().length > 600) throw new Error("Mặt sau không được vượt quá 600 kí tự");
 
   const card = await createFlashcard(deckId, {
     front: data.front.trim(),
