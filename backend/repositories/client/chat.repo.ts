@@ -15,7 +15,12 @@ export const createMessage = async (senderId: string, receiverId: string, conten
       ...(replyToId && { replyToId }),
     },
     include: {
-      sender: { select: { id: true, name: true, avatarUrl: true } }
+      sender: { select: { id: true, name: true, avatarUrl: true } },
+      replyTo: {
+        include: {
+          sender: { select: { id: true, name: true, avatarUrl: true } }
+        }
+      }
     }
   })
 }
@@ -27,6 +32,14 @@ export const getMessageBetweenUsers = async (user1Id: string, user2Id: string) =
         { senderId: user1Id, receiverId: user2Id, deletedBySender: false },
         { senderId: user2Id, receiverId: user1Id, deletedByReceiver: false }
       ]
+    },
+    include: {
+      sender: { select: { id: true, name: true, avatarUrl: true } },
+      replyTo: {
+        include: {
+          sender: { select: { id: true, name: true, avatarUrl: true } }
+        }
+      }
     },
     orderBy: {
       createdAt: "asc"
@@ -93,7 +106,12 @@ export const createGroupMessage = async (
   return prisma.message.create({
     data,
     include: {
-      sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
+      sender: { select: { id: true, name: true, avatarUrl: true, email: true } },
+      replyTo: {
+        include: {
+          sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
+        }
+      }
     }
   });
 };
