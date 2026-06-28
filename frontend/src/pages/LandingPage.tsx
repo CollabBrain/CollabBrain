@@ -1,7 +1,8 @@
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuthStore } from '../store/useAuthStore';
 import { ROUTES } from '../constants';
 import { ArrowRight, ExternalLink } from 'lucide-react';
+import { useSettings } from '../hooks/useSettings';
 
 /**
  * LandingPage — Trang chủ giới thiệu Studifier (Mockup 1).
@@ -10,6 +11,10 @@ import { ArrowRight, ExternalLink } from 'lucide-react';
 const LandingPage = () => {
   const navigate = useNavigate();
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const { data: settings } = useSettings();
+
+  const webName = settings?.web_name || 'Studifier';
+  const footerText = settings?.footer || `Studifier &copy; ${new Date().getFullYear()} &bull; Hệ sinh thái học tập AI`;
 
   const handleGetStarted = () => {
     if (isAuthenticated) {
@@ -22,20 +27,20 @@ const LandingPage = () => {
   const steps = [
     {
       num: 1,
-      title: 'Upload Documents',
-      desc: 'Drop your PDFs, slides, or notes into the platform.',
+      title: 'Tải tài liệu lên',
+      desc: 'Kéo thả các file PDF, slide bài giảng hoặc ghi chú của bạn vào hệ thống.',
       bg: 'bg-indigo-50 text-indigo-600',
     },
     {
       num: 2,
-      title: 'AI Processing',
-      desc: 'Our engine analyzes and organizes your study materials instantly.',
+      title: 'AI xử lý tự động',
+      desc: 'Hệ thống AI phân tích và sắp xếp tài liệu học tập của bạn ngay lập tức.',
       bg: 'bg-violet-50 text-violet-600',
     },
     {
       num: 3,
-      title: 'Interactive Learning',
-      desc: 'Chat with your documents, generate quizzes, and master topics faster.',
+      title: 'Học tập tương tác',
+      desc: 'Hỏi đáp trực tiếp với tài liệu, tự động tạo flashcard và ghi nhớ kiến thức nhanh hơn.',
       bg: 'bg-blue-50 text-blue-600',
     },
   ];
@@ -50,9 +55,9 @@ const LandingPage = () => {
       {/* Top Header Logo */}
       <header className="max-w-7xl mx-auto w-full px-6 md:px-12 py-6 shrink-0 z-10 flex items-center justify-between">
         <div className="flex flex-col gap-0.5">
-          <span className="text-2xl font-black text-indigo-600 tracking-tight">Studifier</span>
+          <span className="text-2xl font-black text-indigo-600 tracking-tight">{webName}</span>
           <span className="text-[9px] uppercase font-bold text-slate-400 tracking-widest pl-0.5">
-            AI LEARNING
+            HỆ SINH THÁI AI
           </span>
         </div>
 
@@ -62,7 +67,7 @@ const LandingPage = () => {
             onClick={handleGetStarted}
             className="text-sm font-bold text-indigo-600 hover:text-indigo-800 transition-colors bg-transparent border-0 outline-none cursor-pointer"
           >
-            {isAuthenticated ? 'Go to Workspace' : 'Sign In'}
+            {isAuthenticated ? 'Đến không gian làm việc' : 'Đăng nhập'}
           </button>
         </div>
       </header>
@@ -74,13 +79,13 @@ const LandingPage = () => {
         <div className="flex-1 space-y-8 text-left max-w-xl">
           <div className="space-y-4">
             <h2 className="text-[36px] md:text-[56px] font-black text-indigo-600 leading-none tracking-tight">
-              Studifier
+              {webName}
             </h2>
             <h1 className="text-[28px] md:text-[44px] font-extrabold text-slate-800 leading-tight tracking-tight">
-              Your Premium AI Learning Partner
+              Trợ lý học tập AI cao cấp của bạn
             </h1>
             <p className="text-slate-500 text-base md:text-lg leading-relaxed font-medium max-w-md pt-2">
-              Elevate your study experience with intelligent tools designed for focus, clarity, and rapid mastery.
+              Nâng tầm trải nghiệm học tập với các công cụ thông minh được thiết kế giúp tập trung, dễ hiểu và nhanh chóng làm chủ kiến thức.
             </p>
           </div>
 
@@ -99,7 +104,7 @@ const LandingPage = () => {
         <div className="w-full md:w-[460px] shrink-0">
           <div className="bg-white/85 border border-slate-100 rounded-3xl p-8 md:p-10 shadow-[0_20px_50px_rgba(99,102,241,0.05)] backdrop-blur-md">
             <h3 className="text-xl font-bold text-slate-800 mb-8 tracking-tight">
-              How to use
+              Hướng dẫn sử dụng
             </h3>
 
             {/* List of Steps */}
@@ -123,13 +128,13 @@ const LandingPage = () => {
 
             {/* Footer External Link */}
             <div className="mt-8 pt-6 border-t border-slate-50 flex justify-center">
-              <a
-                href="#docs"
+              <Link
+                to={ROUTES.DOCS}
                 className="inline-flex items-center gap-1.5 text-xs font-bold text-indigo-600 hover:text-indigo-800 transition-colors hover:underline group"
               >
-                View full documentation
+                Xem tài liệu hướng dẫn đầy đủ
                 <ExternalLink className="w-3.5 h-3.5" />
-              </a>
+              </Link>
             </div>
           </div>
         </div>
@@ -137,9 +142,10 @@ const LandingPage = () => {
       </main>
 
       {/* Footer Branding Copyright */}
-      <footer className="max-w-7xl mx-auto w-full px-6 md:px-12 py-6 text-center text-xs font-semibold text-slate-400 shrink-0 z-10">
-        Studifier &copy; {new Date().getFullYear()} &bull; AI Learning Ecosystem
-      </footer>
+      <footer
+        className="max-w-7xl mx-auto w-full px-6 md:px-12 py-6 text-center text-xs font-semibold text-slate-400 shrink-0 z-10"
+        dangerouslySetInnerHTML={{ __html: footerText }}
+      />
 
     </div>
   );

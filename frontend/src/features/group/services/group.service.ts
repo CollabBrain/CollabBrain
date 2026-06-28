@@ -1,5 +1,6 @@
 import axiosInstance from '../../../services/axiosInstance';
 import type { ApiResponse } from '../../../types';
+import { useQuery } from '@tanstack/react-query';
 
 // ============================================================
 // Types
@@ -18,6 +19,7 @@ export interface GroupData {
   memberCount: number;
   createdAt: string;
   updatedAt: string;
+  joinStatus?: 'none' | 'pending' | 'invited' | 'joined';
 }
 
 export interface GroupWithRole extends GroupData {
@@ -54,6 +56,11 @@ export interface InvitationData {
   id: string;
   group: GroupData;
   invitedBy: {
+    id: string;
+    name: string;
+    avatarUrl?: string;
+  };
+  sender?: {
     id: string;
     name: string;
     avatarUrl?: string;
@@ -145,6 +152,10 @@ export const leaveGroupApi = (groupId: string) =>
 export const joinRequestApi = (groupId: string) =>
   axiosInstance.post<ApiResponse<JoinRequestData>>(`/groups/${groupId}/join-request`);
 
+/** DELETE /groups/:groupId/join-request — Hủy yêu cầu tham gia nhóm */
+export const cancelJoinRequestApi = (groupId: string) =>
+  axiosInstance.delete<ApiResponse<null>>(`/groups/${groupId}/join-request`);
+
 /** GET /groups/:groupId/join-requests — Danh sách yêu cầu tham gia (owner only) */
 export const getJoinRequestsApi = (groupId: string) =>
   axiosInstance.get<ApiResponse<JoinRequestData[]>>(`/groups/${groupId}/join-requests`);
@@ -194,3 +205,18 @@ export const transferOwnerApi = (groupId: string, newOwnerId: string) =>
   axiosInstance.patch<ApiResponse<null>>(`/groups/${groupId}/transfer-owner`, {
     newOwnerId,
   });
+
+// ============================================================
+// React Query Hooks
+// ============================================================
+
+export const useGroupInvitations = () => {
+  return useQuery({
+    queryKey: ['group-invitations'],
+    queryFn: async () => {
+      const res = await getReceivedInvitationsApi();
+      return (res.data?.data ?? []).filter((inv) => inv.status === 'PENDING');
+    },
+    staleTime: 30_000,
+  });
+};

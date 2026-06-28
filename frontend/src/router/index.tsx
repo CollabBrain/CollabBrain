@@ -13,12 +13,15 @@ const RegisterPage = lazy(() => import('../pages/RegisterPage'));
 const ForgotPasswordPage = lazy(() => import('../pages/ForgotPasswordPage'));
 const DashboardPage = lazy(() => import('../pages/DashboardPage'));
 const ProfilePage = lazy(() => import('../pages/ProfilePage'));
+const SettingsPage = lazy(() => import('../pages/SettingsPage'));
 const ChatPage = lazy(() => import('../pages/ChatPage'));
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage'));
 const LandingPage = lazy(() => import('../pages/LandingPage'));
 const DocumentsPage = lazy(() => import('../pages/DocumentsPage'));
 const GroupsPage = lazy(() => import('../pages/GroupsPage'));
 const GroupWorkspacePage = lazy(() => import('../pages/GroupWorkspacePage'));
+const TodoListPage = lazy(() => import('../pages/TodoListPage'));
+const DocsPage = lazy(() => import('../pages/DocsPage'));
 
 // Lazy load friend pages (from feature/friend-ui)
 const FriendsPage = lazy(() => import('../pages/FriendsPage'));
@@ -27,12 +30,18 @@ const SuggestionsPage = lazy(() => import('../pages/SuggestionsPage').then(modul
 const BlockedListPage = lazy(() => import('../pages/BlockedListPage').then(module => ({ default: module.BlockedListPage })));
 const UserProfilePage = lazy(() => import('../pages/UserProfilePage').then(module => ({ default: module.UserProfilePage })));
 
+// Lazy load flashcard pages
+const DecksPage = lazy(() => import('../features/flashcard/pages/DecksPage').then(module => ({ default: module.DecksPage })));
+const DeckDetailPage = lazy(() => import('../features/flashcard/pages/DeckDetailPage').then(module => ({ default: module.DeckDetailPage })));
+
 // Lazy load admin pages
 const AdminLoginPage = lazy(() => import('../pages/admin/AdminLoginPage'));
 const AdminStatsPage = lazy(() => import('../pages/admin/AdminStatsPage'));
 const AdminUsersPage = lazy(() => import('../pages/admin/AdminUsersPage'));
 const AdminGroupsPage = lazy(() => import('../pages/admin/AdminGroupsPage'));
 const AdminReportsPage = lazy(() => import('../pages/admin/AdminReportsPage'));
+const AdminSettingsPage = lazy(() => import('../pages/admin/AdminSettingsPage'));
+const AdminDocumentsPage = lazy(() => import('../pages/admin/AdminDocumentsPage'));
 
 // Spinner toàn màn hình khi đang lazy-load hoặc đợi hydration
 const PageSpinner = () => (
@@ -112,10 +121,12 @@ export const AppRouter = () => {
         >
           <Route path={ROUTES.DASHBOARD} element={<DashboardPage />} />
           <Route path={ROUTES.PROFILE} element={<ProfilePage />} />
+          <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
           <Route path={ROUTES.CHAT} element={<ChatPage />} />
           <Route path={ROUTES.DOCUMENTS} element={<DocumentsPage />} />
           <Route path={ROUTES.GROUPS} element={<GroupsPage />} />
-          <Route path="/groups/:groupId" element={<GroupWorkspacePage />} />
+           <Route path="/groups/:groupId" element={<GroupWorkspacePage />} />
+          <Route path="/todos" element={<TodoListPage />} />
 
           {/* ——— Friend routes (from feature/friend-ui) */}
           <Route path="/friends" element={<FriendsPage />} />
@@ -123,6 +134,10 @@ export const AppRouter = () => {
           <Route path="/friends/suggestions" element={<SuggestionsPage />} />
           <Route path="/friends/blocked" element={<BlockedListPage />} />
           <Route path="/users/:id" element={<UserProfilePage />} />
+
+          {/* ——— Flashcard routes */}
+          <Route path="/flashcard" element={<DecksPage />} />
+          <Route path="/flashcard/decks/:deckId" element={<DeckDetailPage />} />
         </Route>
 
         {/* ——— Admin Guest routes */}
@@ -148,11 +163,16 @@ export const AppRouter = () => {
           <Route path="/admin/dashboard" element={<AdminStatsPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/groups" element={<AdminGroupsPage />} />
+          <Route path="/admin/documents" element={<AdminDocumentsPage />} />
           <Route path="/admin/reports" element={<AdminReportsPage />} />
+          <Route path="/admin/settings" element={<AdminSettingsPage />} />
         </Route>
 
         {/* ——— Public Landing Page */}
         <Route path={ROUTES.HOME} element={<LandingPage />} />
+        
+        {/* ——— Public Docs Page */}
+        <Route path={ROUTES.DOCS} element={<DocsPage />} />
 
         {/* ——— 404 */}
         <Route path="*" element={<NotFoundPage />} />

@@ -2,6 +2,7 @@ import { Request, Response } from "express"
 import { groupTypeData } from "../../types/client/group.types"
 import { acceptInvitationPatchService, acceptMemberPatchService, addMemberPostService, changeRoleUserPatchService, creatGroupPostService, deleteMemberDeleteService, findGroupGetService, groupInfoGetService, inviteMemberPostService, joinRequestPostService, leaveGroupPostService, listInvitationGetService, listRequestGetService, memberGroupGetService, myGroupGetService, rejectInvitationPatchService, rejectMemberPatchService, removeGroupDeleteService, transferOwnerPatchService, updateGroupPatchService } from "../../services/client/group.service"
 import { GroupRole } from "@prisma/client"
+import prisma from "../../config/prisma"
 
 //[POST] /groups
 export const createGroupPost = async (req: Request, res: Response) => {
@@ -50,7 +51,8 @@ export const myGroupGet = async (req: Request, res: Response) => {
 export const findGroupGet = async (req: Request, res: Response) => {
   try {
     const keyword = req.query.keyword as string || ""
-    const result = await findGroupGetService(keyword)
+    const myId = (req as any).user.id
+    const result = await findGroupGetService(keyword, myId)
     res.status(200).json({
       code: 200,
       message: result.message,
@@ -228,6 +230,23 @@ export const joinRequestPost = async (req: Request, res: Response) => {
     const groupId: string = req.params.groupId as string
     const myId = (req as any).user.id
     const result = await joinRequestPostService(groupId, myId)
+
+    // Emit socket event to the group owner
+    const io = req.app.get("io")
+    if (io) {
+      const ownerMember = await prisma.groupMember.findFirst({
+        where: { groupId, role: "OWNER" },
+        select: { userId: true }
+      })
+      if (ownerMember) {
+        io.to(ownerMember.userId).emit("new_group_join_request", {
+          message: "Có yêu cầu tham gia nhóm mới",
+          groupId,
+          invitation: result.data
+        })
+      }
+    }
+
     res.status(200).json({
       data: result.data,
       message: result.message,
@@ -301,6 +320,17 @@ export const inviteMemberPost = async (req: Request, res: Response) => {
     const userId = req.body.userId;
     const myId = (req as any).user.id;
     const result = await inviteMemberPostService(groupId, userId, myId)
+
+    // Emit socket event to the invited user
+    const io = req.app.get("io")
+    if (io) {
+      io.to(userId).emit("new_group_invitation", {
+        message: "Bạn có một lời mời vào nhóm mới",
+        groupId,
+        invitation: result.data
+      })
+    }
+
     res.status(200).json({
       data: result.data,
       message: result.message,
@@ -384,3 +414,40 @@ export const transferOwnerPatch = async (req: Request, res: Response) => {
     })
   }
 }
+
+//[DELETE] /groups/:groupId/join-request — Hủy yêu cầu tham gia nhóm
+export const cancelJoinRequestDelete = async (req: Request, res: Response) => {
+  try {
+    const groupId = req.params.groupId as string;
+    const myId = (req as any).user.id;
+    
+    // Tìm invitation type REQUEST, status PENDING
+    const invitation = await prisma.groupInvitation.findFirst({
+      where: {
+        groupId,
+        userId: myId,
+        type: "REQUEST",
+        status: "PENDING"
+      }
+    });
+
+    if (!invitation) {
+      return res.status(404).json({ code: 404, message: "Không tìm thấy yêu cầu tham gia đang chờ" });
+    }
+
+    await prisma.groupInvitation.delete({
+      where: {
+        id: invitation.id
+      }
+    });
+
+    res.status(200).json({
+      code: 200,
+      message: "Hủy yêu cầu tham gia thành công"
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      message: `Lỗi: ${error.message}`
+    });
+  }
+};

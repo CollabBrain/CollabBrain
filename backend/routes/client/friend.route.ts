@@ -18,4 +18,5 @@ router.get("/requests/receive", ratelimit.authIpLimiter, middleware.authMiddlewa
 router.get("/requests/sent", ratelimit.authIpLimiter, middleware.authMiddleware, controller.sentListGet)
 router.patch("/unblock/:userId", ratelimit.authIpLimiter, middleware.authMiddleware, controller.unblockFriendPatch)
 router.get("/suggestions", ratelimit.authIpLimiter, middleware.authMiddleware, controller.suggestionListGet)
+router.get("/blocked", ratelimit.authIpLimiter, middleware.authMiddleware, controller.blockedListGet)
 export const friendRoutes = router

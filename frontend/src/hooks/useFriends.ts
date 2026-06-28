@@ -34,6 +34,20 @@ export interface FriendSuggestionItem {
   bio: string | null;
 }
 
+/** Kết quả tìm kiếm người lạ để kết bạn */
+export interface SearchStrangerItem {
+  id: string;
+  name: string;
+  email: string;
+  avatarUrl: string | null;
+  bio: string | null;
+  friendship: {
+    status: "PENDING" | "ACCEPTED" | "BLOCKED";
+    senderId: string;
+    receiverId: string;
+  } | null;
+}
+
 // Backend API response wrapper
 interface BackendResponse<T> {
   code: number;
@@ -139,6 +153,7 @@ export const useAcceptRequest = () => {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['friends'] });
       queryClient.invalidateQueries({ queryKey: ['friend-requests', 'received'] });
+      queryClient.invalidateQueries({ queryKey: ['search-strangers'] });
       queryClient.invalidateQueries({ queryKey: ['user-profile'] });
     },
   });
@@ -150,6 +165,7 @@ export const useRejectRequest = () => {
     mutationFn: (userId: string) => friendApi.rejectRequest(userId),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['friend-requests', 'received'] });
+      queryClient.invalidateQueries({ queryKey: ['search-strangers'] });
       queryClient.invalidateQueries({ queryKey: ['user-profile'] });
     },
   });
@@ -162,6 +178,7 @@ export const useSendRequest = () => {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['friend-suggestions'] });
       queryClient.invalidateQueries({ queryKey: ['friend-requests', 'sent'] });
+      queryClient.invalidateQueries({ queryKey: ['search-strangers'] });
       queryClient.invalidateQueries({ queryKey: ['user-profile'] });
     },
   });
@@ -173,6 +190,7 @@ export const useUnrequest = () => {
     mutationFn: (userId: string) => friendApi.unrequest(userId),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['friend-requests', 'sent'] });
+      queryClient.invalidateQueries({ queryKey: ['search-strangers'] });
       queryClient.invalidateQueries({ queryKey: ['user-profile'] });
     },
   });
@@ -184,6 +202,7 @@ export const useUnfriend = () => {
     mutationFn: (userId: string) => friendApi.unfriend(userId),
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['friends'] });
+      queryClient.invalidateQueries({ queryKey: ['search-strangers'] });
       queryClient.invalidateQueries({ queryKey: ['user-profile'] });
     },
   });
@@ -196,7 +215,31 @@ export const useBlockUser = () => {
     onSettled: () => {
       queryClient.invalidateQueries({ queryKey: ['friends'] });
       queryClient.invalidateQueries({ queryKey: ['friend-suggestions'] });
+      queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
       queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    },
+  });
+};
+
+export const useUnblockUser = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => friendApi.unblock(userId),
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['blocked-users'] });
+      queryClient.invalidateQueries({ queryKey: ['friends'] });
+      queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    },
+  });
+};
+
+export const useSearchStrangers = (keyword: string) => {
+  return useQuery({
+    queryKey: ['search-strangers', keyword],
+    enabled: keyword.trim().length >= 2,
+    queryFn: async (): Promise<SearchStrangerItem[]> => {
+      const response = await friendApi.getList(keyword);
+      return (response.data.data as any) ?? [];
     },
   });
 };

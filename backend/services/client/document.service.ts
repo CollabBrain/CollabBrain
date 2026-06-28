@@ -10,6 +10,7 @@ import {
 } from "../../repositories/client/document.repo";
 import { findGroupById, findGroupMember } from "../../repositories/client/group.repo";
 import { uploadToSupabase } from "../../helpers/upload";
+import { ingestDocumentService } from "./rag.service";
 
 // ============================================================
 // Helpers
@@ -45,7 +46,8 @@ const getDocumentTypeFromMime = (mimeType: string): DocumentType => {
  */
 export const uploadPersonalDocumentService = async (
   file: Express.Multer.File,
-  userId: string
+  userId: string,
+  conversationId?: string
 ) => {
   if (!file) throw new Error("Không tìm thấy file để upload");
 
@@ -62,8 +64,14 @@ export const uploadPersonalDocumentService = async (
     size: file.size,
     mimeType: file.mimetype,
     groupId: undefined, // tài liệu cá nhân
+    conversationId,
     uploadedBy: userId,
   });
+
+  // Tự động kích hoạt phân tích RAG bất đồng bộ (fire-and-forget)
+  ingestDocumentService(document.id).catch((err) =>
+    console.error(`Tự động phân tích RAG thất bại cho tài liệu cá nhân ${document.id}:`, err)
+  );
 
   return {
     data: document,
@@ -110,6 +118,11 @@ export const uploadGroupDocumentService = async (
     uploadedBy: userId,
   });
 
+  // Tự động kích hoạt phân tích RAG bất đồng bộ (fire-and-forget)
+  ingestDocumentService(document.id).catch((err) =>
+    console.error(`Tự động phân tích RAG thất bại cho tài liệu nhóm ${document.id}:`, err)
+  );
+
   return {
     data: document,
     message: "Upload tài liệu vào nhóm thành công",
@@ -154,7 +167,9 @@ export const getGroupDocumentsService = async (
 
   // Kiểm tra user là thành viên (OWNER/MEMBER/VIEWER đều được xem)
   const member = await findGroupMember(groupId, userId);
-  if (!member) throw new Error("Bạn không phải thành viên nhóm, không thể xem tài liệu");
+  if (!member && group.visibility !== "PUBLIC") {
+    throw new Error("Bạn không phải thành viên nhóm, không thể xem tài liệu");
+  }
 
   const docType = type && type !== "all" ? (type as DocumentType) : undefined;
   const result = await findDocumentsByGroupId(groupId, { search, type: docType });
@@ -162,7 +177,7 @@ export const getGroupDocumentsService = async (
   // Thêm field canDelete cho mỗi document
   const documentsWithPermission = result.documents.map((doc: any) => ({
     ...doc,
-    canDelete: doc.uploadedBy === userId || member.role === "OWNER",
+    canDelete: doc.uploadedBy === userId || member?.role === "OWNER",
   }));
 
   return {
@@ -184,9 +199,12 @@ export const getDocumentDetailService = async (
 
   // Kiểm tra quyền xem
   if (document.groupId) {
-    // Tài liệu group → user phải là member
+    // Tài liệu group → user phải là member (hoặc group public)
+    const group = await findGroupById(document.groupId);
     const member = await findGroupMember(document.groupId, userId);
-    if (!member) throw new Error("Bạn không có quyền xem tài liệu này");
+    if (!member && group?.visibility !== "PUBLIC") {
+      throw new Error("Bạn không có quyền xem tài liệu này");
+    }
   } else {
     // Tài liệu cá nhân → chỉ người upload
     if (document.uploadedBy !== userId) {

@@ -2,6 +2,7 @@ import {
   useQuery,
   useMutation,
   useInfiniteQuery,
+  useQueryClient,
 } from '@tanstack/react-query';
 import { useCallback, useEffect, useRef } from 'react';
 import { getSocket } from '../../../socket/socket';
@@ -326,6 +327,7 @@ export const useChatSocket = () => {
   const setTyping = useChatStore((s) => s.setTyping);
   const setOnlineStatus = useChatStore((s) => s.setOnlineStatus);
   const accessToken = useAuthStore((s) => s.accessToken);
+  const queryClient = useQueryClient();
 
   const conversationsRef = useRef(useChatStore.getState().conversations);
   useEffect(() => {
@@ -353,9 +355,11 @@ export const useChatSocket = () => {
           updatedAt: message.createdAt,
           unreadCount: isFromMe ? conv.unreadCount : conv.unreadCount + 1,
         });
+      } else {
+        queryClient.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
       }
     },
-    [addMessage, addOrUpdate, accessToken]
+    [addMessage, addOrUpdate, accessToken, queryClient]
   );
 
   const handleTyping = useCallback(
@@ -370,6 +374,14 @@ export const useChatSocket = () => {
       setOnlineStatus(userId, isOnline);
     },
     [setOnlineStatus]
+  );
+
+  const handleInitialOnline = useCallback(
+    ({ onlineUserIds }: { onlineUserIds: string[] }) => {
+      // Bulk-set tất cả users hiện đang online khi mới kết nối
+      useChatStore.getState().setMultipleOnlineStatus(onlineUserIds, true);
+    },
+    []
   );
 
   const handleMessageRecalled = useCallback(
@@ -436,6 +448,7 @@ export const useChatSocket = () => {
     socket.on('chat:new_message', handleNewMessage);
     socket.on('chat:typing', handleTyping);
     socket.on('user:online_status', handleOnlineStatus);
+    socket.on('user:initial_online', handleInitialOnline);
     socket.on('chat:message_recalled', handleMessageRecalled);
     socket.on('chat:message_deleted', handleMessageDeleted);
     socket.on('chat:message_pinned', handleMessagePinned);
@@ -444,11 +457,12 @@ export const useChatSocket = () => {
       socket.off('chat:new_message', handleNewMessage);
       socket.off('chat:typing', handleTyping);
       socket.off('user:online_status', handleOnlineStatus);
+      socket.off('user:initial_online', handleInitialOnline);
       socket.off('chat:message_recalled', handleMessageRecalled);
       socket.off('chat:message_deleted', handleMessageDeleted);
       socket.off('chat:message_pinned', handleMessagePinned);
     };
-  }, [accessToken, handleNewMessage, handleTyping, handleOnlineStatus, handleMessageRecalled, handleMessageDeleted]);
+  }, [accessToken, handleNewMessage, handleTyping, handleOnlineStatus, handleInitialOnline, handleMessageRecalled, handleMessageDeleted]);
 };
 
 // ========== Emit helpers ==========

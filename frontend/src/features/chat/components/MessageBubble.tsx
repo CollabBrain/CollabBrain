@@ -1,6 +1,32 @@
 import { cn } from '../../../lib/utils';
 import type { Message, ChatUser } from '../../../types/chat.types';
-import { CheckCheck, Check, FileText, Download } from 'lucide-react';
+import { CheckCheck, Check, FileText, Download, Phone, PhoneMissed, Video, PhoneOff } from 'lucide-react';
+
+const renderMessageTextWithLinks = (text: string, isMine: boolean) => {
+  if (!text) return '';
+  const urlRegex = /(https?:\/\/[^\s]+)/g;
+  const parts = text.split(urlRegex);
+  return parts.map((part, index) => {
+    if (part.match(urlRegex)) {
+      return (
+        <a
+          key={index}
+          href={part}
+          target="_blank"
+          rel="noopener noreferrer"
+          className={cn(
+            "underline break-all",
+            isMine ? "text-primary-foreground hover:opacity-90" : "text-blue-600 hover:underline"
+          )}
+        >
+          {part}
+        </a>
+      );
+    }
+    return part;
+  });
+};
+
 
 interface MessageBubbleProps {
   message: Message;
@@ -9,6 +35,7 @@ interface MessageBubbleProps {
   showAvatar?: boolean;
   isFirstInGroup?: boolean;
   isLastInGroup?: boolean;
+  onCallAgain?: (type: 'audio' | 'video') => void;
 }
 
 const formatTime = (dateStr: string | null | undefined) => {
@@ -40,13 +67,99 @@ const Avatar = ({ user }: { user: ChatUser }) => {
   );
 };
 
+const formatDuration = (secondsStr: string) => {
+  const secs = parseInt(secondsStr, 10);
+  if (isNaN(secs)) return '';
+  if (secs < 60) return `${secs} giây`;
+  const mins = Math.floor(secs / 60);
+  const remain = secs % 60;
+  return remain > 0 ? `${mins} phút ${remain} giây` : `${mins} phút`;
+};
+
+const extractFileNameFromUrl = (url: string) => {
+  try {
+    const urlObj = new URL(url);
+    const filenameParam = urlObj.searchParams.get('filename');
+    if (filenameParam) {
+      return decodeURIComponent(filenameParam);
+    }
+  } catch (e) {
+    // ignore
+  }
+  return url.split('/').pop()?.split('?')[0] || 'Tài liệu đính kèm';
+};
+
+interface CallLogBubbleProps {
+  type: string;
+  status: string;
+  duration?: string;
+  isMine: boolean;
+  onCallAgain?: (type: 'audio' | 'video') => void;
+}
+
+const CallLogBubble = ({ type, status, duration, isMine, onCallAgain }: CallLogBubbleProps) => {
+  const isVideo = type === 'video';
+  const isMissed = status === 'missed' || status === 'rejected';
+
+  // Config colors and icons based on state
+  let Icon = isVideo ? Video : Phone;
+  let title = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+  
+  if (status === 'missed') {
+    Icon = PhoneMissed;
+    title = isVideo ? 'Cuộc gọi video nhỡ' : 'Cuộc gọi thoại nhỡ';
+  } else if (status === 'rejected') {
+    Icon = PhoneOff;
+    title = isVideo ? 'Từ chối cuộc gọi video' : 'Từ chối cuộc gọi thoại';
+  } else if (status === 'ended') {
+    title = isVideo ? 'Cuộc gọi video' : 'Cuộc gọi thoại';
+  }
+
+  const handleClick = () => {
+    if (onCallAgain) onCallAgain(type as 'audio' | 'video');
+  };
+
+  return (
+    <div 
+      className={cn(
+        "flex items-center gap-3 p-1 min-w-[180px]",
+        isMissed && !isMine ? "text-rose-500" : "",
+        !isMine || status !== 'ended' ? "cursor-pointer hover:opacity-80 transition-opacity" : ""
+      )}
+      onClick={(!isMine || status !== 'ended') ? handleClick : undefined}
+    >
+      <div className={cn(
+        "w-10 h-10 rounded-full flex items-center justify-center shrink-0",
+        isMine ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/10 text-primary",
+        isMissed && !isMine && "bg-rose-100 text-rose-500"
+      )}>
+        <Icon className="w-5 h-5" />
+      </div>
+      <div className="flex flex-col">
+        <span className="font-semibold text-sm">{title}</span>
+        {status === 'ended' && duration ? (
+          <span className="text-xs opacity-80">{formatDuration(duration)}</span>
+        ) : (
+          <span className="text-xs opacity-80">Nhấn để gọi lại</span>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const MessageBubble = ({
   message,
   isMine,
   sender,
   showAvatar = true,
   isLastInGroup = true,
+  onCallAgain,
 }: MessageBubbleProps) => {
+  // Kểm tra xem đây có phải là tin nhắn hệ thống ghi log cuộc gọi không
+  const callMatch = message.type === 'text' || (message.type as any) === 'TEXT' 
+    ? message.content.match(/^\[CALL:(audio|video):(missed|rejected|ended)(?::(\d+))?\]$/)
+    : null;
+
   return (
     <div
       id={`msg-${message.id}`}
@@ -111,7 +224,7 @@ const MessageBubble = ({
           {/* Message Content */}
           {message.isRecalled ? (
             <span className="italic opacity-80">{message.content}</span>
-          ) : message.type === 'image' || message.type === 'IMAGE' ? (
+          ) : message.type === 'image' || (message.type as string) === 'IMAGE' ? (
             <div className="mt-1 mb-1">
               <img
                 src={message.content}
@@ -121,7 +234,7 @@ const MessageBubble = ({
                 loading="lazy"
               />
             </div>
-          ) : message.type === 'file' || message.type === 'FILE' ? (
+          ) : message.type === 'file' || (message.type as string) === 'FILE' ? (
             <a
               href={message.content}
               target="_blank"
@@ -139,14 +252,22 @@ const MessageBubble = ({
               </div>
               <div className="flex-1 min-w-0 flex flex-col">
                 <span className="font-medium text-sm truncate">
-                  {message.content.split('/').pop()?.split('?')[0] || 'Tài liệu đính kèm'}
+                  {extractFileNameFromUrl(message.content)}
                 </span>
                 <span className="text-xs opacity-70">Nhấn để tải xuống</span>
               </div>
               <Download className="h-4 w-4 shrink-0 opacity-70" />
             </a>
+          ) : callMatch ? (
+            <CallLogBubble 
+              type={callMatch[1]} 
+              status={callMatch[2]} 
+              duration={callMatch[3]} 
+              isMine={isMine} 
+              onCallAgain={onCallAgain} 
+            />
           ) : (
-            <span>{message.content}</span>
+            <span>{renderMessageTextWithLinks(message.content, isMine)}</span>
           )}
         </div>
 

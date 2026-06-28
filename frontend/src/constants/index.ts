@@ -17,7 +17,11 @@ export const ROUTES = {
   FORGOT_PASSWORD: '/forgot-password',
   DASHBOARD: '/dashboard',
   PROFILE: '/profile',
+  SETTINGS: '/settings',
   CHAT: '/chat',
   DOCUMENTS: '/documents',
   GROUPS: '/groups',
+  FRIENDS: '/friends',
+  FLASHCARD: '/flashcard',
+  DOCS: '/docs',
 } as const;

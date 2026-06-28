@@ -1,15 +1,30 @@
-import { useState, memo } from 'react';
+import { useState, memo, useEffect } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, FileText, User, Users, UserCircle, Settings, LogOut, Menu, X, CheckSquare, Layers } from 'lucide-react';
 import { useAuthStore } from '../store/useAuthStore';
 import { useProfile } from '../features/profile/hooks/useProfile';
+import { useChatStore } from '../store/useChatStore';
 import { ROUTES } from '../constants';
 import { cn } from '../lib/utils';
+import { CallOverlay } from '../features/chat/components/CallOverlay';
+import { useCallStore } from '../store/useCallStore';
+import { getSocket, initSocket, disconnectSocket } from '../socket/socket';
+import { useSettings } from '../hooks/useSettings';
+import { NotificationBell } from '../components/NotificationBell';
+import { useChatSocket, useConversations } from '../features/chat/hooks/useChat';
+import { useFriendRequests } from '../hooks/useFriends';
+import { useGroupInvitations } from '../features/group/services/group.service';
+import { useQueryClient } from '@tanstack/react-query';
+import { useGroupChatStore } from '../store/useGroupChatStore';
+import { useNotificationSettings } from '../hooks/useNotificationSettings';
 
 // ——— Nav items config ———
 const NAV_ITEMS = [
+  { to: ROUTES.DASHBOARD, label: 'Dashboard', icon: LayoutDashboard },
   { to: ROUTES.CHAT, label: 'Chat', icon: MessageSquare },
   { to: ROUTES.DOCUMENTS, label: 'My Documents', icon: FileText },
+  { to: '/flashcard', label: 'Flashcard', icon: Layers },
+  { to: '/todos', label: 'Todo List', icon: CheckSquare },
   { to: '/friends', label: 'Friends', icon: User },
   { to: '/groups', label: 'Groups', icon: Users },
   { to: ROUTES.PROFILE, label: 'Profile', icon: UserCircle },
@@ -23,6 +38,10 @@ interface SidebarContentProps {
   userTier: string;
   onNavClick?: () => void;
   onLogout: () => void;
+  webName?: string;
+  chatUnreadCount: number;
+  friendRequestsCount: number;
+  groupInvitationsCount: number;
 }
 
 const SidebarContent = memo(({
@@ -32,6 +51,10 @@ const SidebarContent = memo(({
   userTier,
   onNavClick,
   onLogout,
+  webName,
+  chatUnreadCount,
+  friendRequestsCount,
+  groupInvitationsCount,
 }: SidebarContentProps) => {
   const isActive = (path: string) => {
     if (path === ROUTES.CHAT) return pathname.startsWith(ROUTES.CHAT);
@@ -44,7 +67,7 @@ const SidebarContent = memo(({
         {/* Logo Branding */}
         <div className="flex flex-col gap-0.5 px-2">
           <Link to="/" className="text-[26px] font-extrabold text-indigo-600 tracking-tight flex items-center gap-1.5 hover:opacity-90">
-            Studifier
+            {webName || 'Studifier'}
           </Link>
           <span className="text-[9px] uppercase font-bold text-slate-400 tracking-widest pl-0.5">
             AI LEARNING
@@ -55,6 +78,15 @@ const SidebarContent = memo(({
         <nav className="flex flex-col gap-1.5">
           {NAV_ITEMS.map(({ to, label, icon: Icon }) => {
             const active = isActive(to);
+            const isChat = to === ROUTES.CHAT;
+            const isFriends = to === '/friends';
+            const isGroups = to === '/groups';
+
+            let badgeCount = 0;
+            if (isChat) badgeCount = chatUnreadCount;
+            if (isFriends) badgeCount = friendRequestsCount;
+            if (isGroups) badgeCount = groupInvitationsCount;
+
             return (
               <Link
                 key={to}
@@ -69,6 +101,11 @@ const SidebarContent = memo(({
               >
                 <Icon className={cn('h-5 w-5', active ? 'text-indigo-600' : 'text-slate-400')} />
                 {label}
+                {badgeCount > 0 && (
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center px-1">
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </span>
+                )}
                 {active && (
                   <span className="absolute right-0.5 top-[25%] bottom-[25%] w-1.5 rounded-l bg-indigo-600" />
                 )}
@@ -102,8 +139,9 @@ const SidebarContent = memo(({
 
         {/* Utility Buttons: Settings & Logout */}
         <div className="flex items-center justify-between px-2">
+          <NotificationBell />
           <Link
-            to={ROUTES.PROFILE}
+            to={ROUTES.SETTINGS}
             title="Settings"
             className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-50 rounded-lg transition-colors cursor-pointer"
           >
@@ -133,15 +171,134 @@ const MainLayout = () => {
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const { data: profile } = useProfile();
+  const accessToken = useAuthStore((s) => s.accessToken);
+  const queryClient = useQueryClient();
 
   const [isMobileOpen, setIsMobileOpen] = useState(false);
+  const { setIncomingCall, status } = useCallStore();
 
   const handleLogout = () => {
     logout();
-    navigate(ROUTES.LOGIN);
+    window.location.replace(ROUTES.LOGIN);
   };
 
   const closeMobile = () => setIsMobileOpen(false);
+
+  // Initialize and clean up socket connection globally
+  useEffect(() => {
+    if (accessToken) {
+      initSocket(accessToken);
+    } else {
+      disconnectSocket();
+    }
+  }, [accessToken]);
+
+  // Setup global chat socket listener
+  useChatSocket();
+  useConversations();
+
+  // Fetch notification settings
+  const { data: notifSettings } = useNotificationSettings();
+  const isNotifEnabled = notifSettings?.enableAll !== false;
+  const isChatEnabled = notifSettings?.enableChat !== false;
+  const isFriendEnabled = notifSettings?.enableFriend !== false;
+  const isGroupEnabled = notifSettings?.enableGroup !== false;
+
+  // Fetch real-time count of friend requests and group invitations
+  const { data: friendRequests = [] } = useFriendRequests('received');
+  const { data: groupInvitations = [] } = useGroupInvitations();
+  const unreadGroupMessagesCount = useGroupChatStore((s) => s.totalUnreadCount);
+  const totalUnread = useChatStore((s) => s.totalUnreadCount);
+
+  // Clear unread count for group when viewing its chat
+  useEffect(() => {
+    const pathMatch = pathname.match(/^\/groups\/([^/]+)/);
+    if (pathMatch) {
+      const activeGroupId = pathMatch[1];
+      useGroupChatStore.getState().clearUnread(activeGroupId);
+    }
+  }, [pathname]);
+
+  // Listen to other real-time notifications via socket
+  useEffect(() => {
+    if (!accessToken) return;
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleNewFriendRequest = () => {
+      queryClient.invalidateQueries({ queryKey: ['friend-requests', 'received'] });
+    };
+
+    const handleAcceptFriendRequest = () => {
+      queryClient.invalidateQueries({ queryKey: ['friends'] });
+    };
+
+    const handleNewGroupInvitation = () => {
+      queryClient.invalidateQueries({ queryKey: ['group-invitations'] });
+    };
+
+    const handleNewGroupJoinRequest = () => {
+      queryClient.invalidateQueries({ queryKey: ['group-invitations'] });
+    };
+
+    const handleGroupNewMessage = ({ groupId, message }: { groupId: string; message: any }) => {
+      const pathMatch = window.location.pathname.match(/^\/groups\/([^/]+)/);
+      const activeGroupId = pathMatch ? pathMatch[1] : null;
+
+      let myId = '';
+      try {
+        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        myId = payload.id ?? payload.sub ?? payload.userId ?? '';
+      } catch {}
+
+      const isFromMe = message.senderId === myId;
+      if (groupId !== activeGroupId && !isFromMe) {
+        useGroupChatStore.getState().incrementUnread(groupId);
+      }
+    };
+
+    socket.on('new_request_friend', handleNewFriendRequest);
+    socket.on('accept_friend_request', handleAcceptFriendRequest);
+    socket.on('new_group_invitation', handleNewGroupInvitation);
+    socket.on('new_group_join_request', handleNewGroupJoinRequest);
+    socket.on('group:new_message', handleGroupNewMessage);
+
+    return () => {
+      socket.off('new_request_friend', handleNewFriendRequest);
+      socket.off('accept_friend_request', handleAcceptFriendRequest);
+      socket.off('new_group_invitation', handleNewGroupInvitation);
+      socket.off('new_group_join_request', handleNewGroupJoinRequest);
+      socket.off('group:new_message', handleGroupNewMessage);
+    };
+  }, [accessToken, queryClient]);
+
+  // ——— Lắng nghe cuộc gọi đến từ bất kỳ trang nào ———
+  useEffect(() => {
+    const socket = getSocket();
+    if (!socket) return;
+
+    const handleIncomingCall = (data: {
+      callerId: string;
+      callType: 'audio' | 'video';
+      callerInfo: { name: string; avatarUrl?: string | null };
+    }) => {
+      if (status !== 'idle') {
+        socket.emit('call:reject', { callerId: data.callerId, reason: 'busy' });
+        return;
+      }
+      setIncomingCall({
+        callerId: data.callerId,
+        callType: data.callType,
+        callerInfo: data.callerInfo,
+      });
+    };
+
+    socket.on('call:incoming', handleIncomingCall);
+    return () => { socket.off('call:incoming', handleIncomingCall); };
+  }, [status, setIncomingCall]);
+
+  const { data: settings } = useSettings();
+  const webName = settings?.web_name || 'Studifier';
 
   // Avatar mặc định hoặc lấy từ profile
   const userAvatar = profile?.avatarUrl || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&q=80&w=200';
@@ -155,14 +312,20 @@ const MainLayout = () => {
     userName,
     userTier,
     onLogout: handleLogout,
+    webName,
+    chatUnreadCount: isNotifEnabled && isChatEnabled ? totalUnread : 0,
+    friendRequestsCount: isNotifEnabled && isFriendEnabled ? friendRequests.length : 0,
+    groupInvitationsCount: isNotifEnabled && isGroupEnabled ? (groupInvitations.length + unreadGroupMessagesCount) : 0,
   };
 
   return (
     <div className="min-h-screen bg-slate-50/30 flex flex-col md:flex-row overflow-hidden font-sans">
+      {/* CallOverlay — toàn cục, nằm trên tất cả nội dung */}
+      <CallOverlay />
       {/* Mobile Navbar Header */}
       <header className="md:hidden shrink-0 h-16 border-b bg-white flex items-center justify-between px-6 z-40">
         <div className="flex flex-col">
-          <span className="text-xl font-black text-indigo-600 tracking-tight">Studifier</span>
+          <span className="text-xl font-black text-indigo-600 tracking-tight">{webName}</span>
           <span className="text-[8px] font-bold text-slate-400 tracking-wider">AI LEARNING</span>
         </div>
         <button
@@ -209,6 +372,11 @@ const MainLayout = () => {
           </div>
         ) : pathname.match(/^\/groups\/.+/) ? (
           // GroupWorkspacePage: full width, tự cuộn, không giới hạn max-width
+          <div className="flex-1 overflow-y-auto">
+            <Outlet />
+          </div>
+        ) : pathname.startsWith('/flashcard') ? (
+          // Flashcard pages: full width
           <div className="flex-1 overflow-y-auto">
             <Outlet />
           </div>

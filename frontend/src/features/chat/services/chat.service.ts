@@ -81,7 +81,7 @@ export const togglePinMessageApi = (messageId: string) =>
 export const uploadFileApi = (file: File) => {
   const formData = new FormData();
   formData.append('file', file);
-  return axiosInstance.post<ApiResponse<{ url: string; original_filename: string; resource_type: string; size?: number }>>(
+  return axiosInstance.post<ApiResponse<{ url: string; fileName: string }>>(
     '/chat/upload',
     formData,
     {
@@ -89,3 +89,10 @@ export const uploadFileApi = (file: File) => {
     }
   );
 };
+
+/** Gọi RAG Q&A trên tài liệu */
+export const queryRagApi = (question: string, groupId?: string, conversationId?: string) =>
+  axiosInstance.post<ApiResponse<{ answer: string; sources: Array<{ documentName: string; documentUrl: string; chunkIndex: number }> }>>(
+    '/rag/query',
+    { question, groupId, conversationId }
+  );

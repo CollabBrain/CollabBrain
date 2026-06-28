@@ -126,10 +126,10 @@ const AdminGroupsPage = () => {
 
       {/* Title */}
       <div>
-        <h1 className="text-3xl font-black text-white tracking-tight">
+        <h1 className="text-2xl font-bold text-white tracking-tight">
           Quản lý Nhóm học tập
         </h1>
-        <p className="text-slate-400 text-sm font-medium mt-1">
+        <p className="text-slate-400 text-xs font-medium mt-1">
           Giám sát danh sách nhóm học tập, khóa nhóm hoặc xóa các nhóm học tập vi phạm
         </p>
       </div>

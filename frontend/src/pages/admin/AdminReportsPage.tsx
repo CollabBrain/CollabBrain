@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import adminAxiosInstance from '../../services/adminAxiosInstance';
-import { ShieldAlert, Check, Flag, ArrowRight, CornerDownRight, ShieldCheck, Loader2, UserX, UserCheck } from 'lucide-react';
+import { ShieldAlert, Check, ArrowRight, CornerDownRight, ShieldCheck, Loader2, UserX, UserCheck, Eye, X } from 'lucide-react';
 
 interface Reporter {
   id: string;
@@ -29,6 +30,7 @@ interface Report {
   targetGroupId: string | null;
   reason: string;
   status: 'PENDING' | 'RESOLVED';
+  resolutionNotes: string | null;
   createdAt: string;
   reporter: Reporter;
   targetUser: TargetUser | null;
@@ -52,6 +54,10 @@ const AdminReportsPage = () => {
   // Quick Action Modal/Action State
   const [resolvingId, setResolvingId] = useState<string | null>(null);
   const [togglingUserId, setTogglingUserId] = useState<string | null>(null);
+
+  // Resolution Notes Modal
+  const [noteModalReport, setNoteModalReport] = useState<Report | null>(null);
+  const [notesText, setNotesText] = useState('');
 
   const handleToggleUserStatus = async (userId: string, currentStatus: boolean) => {
     if (!window.confirm(`Bạn có chắc muốn ${currentStatus ? 'khóa' : 'mở khóa'} tài khoản người dùng này?`)) {
@@ -101,13 +107,17 @@ const AdminReportsPage = () => {
     setTimeout(() => setToast(null), 3000);
   };
 
-  const handleResolveReport = async (reportId: string) => {
-    setResolvingId(reportId);
+  const handleResolveReport = async () => {
+    if (!noteModalReport) return;
+    setResolvingId(noteModalReport.id);
     try {
-      await adminAxiosInstance.patch(`/reports/${reportId}/resolve`, {
+      await adminAxiosInstance.patch(`/reports/${noteModalReport.id}/resolve`, {
         status: 'RESOLVED',
+        resolutionNotes: notesText.trim() || null
       });
       showToast('Đã đánh dấu giải quyết báo cáo', 'success');
+      setNoteModalReport(null);
+      setNotesText('');
       fetchReports();
     } catch (err: any) {
       console.error(err);
@@ -134,10 +144,10 @@ const AdminReportsPage = () => {
 
       {/* Title */}
       <div>
-        <h1 className="text-3xl font-black text-white tracking-tight">
+        <h1 className="text-2xl font-bold text-white tracking-tight">
           Quản lý Báo cáo Vi phạm
         </h1>
-        <p className="text-slate-400 text-sm font-medium mt-1">
+        <p className="text-slate-400 text-xs font-medium mt-1">
           Xem xét các báo cáo nội dung hoặc hành vi vi phạm chuẩn mực cộng đồng từ các thành viên
         </p>
       </div>
@@ -150,7 +160,7 @@ const AdminReportsPage = () => {
             <p className="text-slate-550 text-xs font-bold">Đang tải danh sách báo cáo...</p>
           </div>
         ) : reports.length === 0 ? (
-          <div className="py-20 text-center text-slate-550 font-bold">
+          <div className="py-20 text-center text-slate-555 font-bold">
             Hệ thống an toàn. Chưa có báo cáo vi phạm nào!
           </div>
         ) : (
@@ -170,13 +180,31 @@ const AdminReportsPage = () => {
                     </span>
                     <ArrowRight className="h-3 w-3 text-slate-600" />
                     {report.targetUser ? (
-                      <span className="text-xs font-bold text-rose-400 bg-rose-950/50 border border-rose-900/30 px-2.5 py-1 rounded-lg">
-                        Báo cáo User: {report.targetUser.name}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-bold text-rose-400 bg-rose-950/50 border border-rose-900/30 px-2.5 py-1 rounded-lg">
+                          Báo cáo User: {report.targetUser.name}
+                        </span>
+                        <Link
+                          to={`/admin/documents?uploadedBy=${report.targetUser.id}`}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300 bg-indigo-950/30 px-2 py-0.5 rounded border border-indigo-900/30 transition-colors"
+                          title="Kiểm duyệt các tài liệu của thành viên này"
+                        >
+                          <Eye className="h-3 w-3" /> Tài liệu
+                        </Link>
+                      </div>
                     ) : report.targetGroup ? (
-                      <span className="text-xs font-bold text-amber-400 bg-amber-950/50 border border-amber-900/30 px-2.5 py-1 rounded-lg">
-                        Báo cáo Group: {report.targetGroup.name}
-                      </span>
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <span className="text-xs font-bold text-amber-400 bg-amber-950/50 border border-amber-900/30 px-2.5 py-1 rounded-lg">
+                          Báo cáo Group: {report.targetGroup.name}
+                        </span>
+                        <Link
+                          to={`/admin/documents?groupId=${report.targetGroup.id}`}
+                          className="inline-flex items-center gap-1 text-[10px] font-bold text-amber-400 hover:text-amber-300 bg-amber-955/20 px-2 py-0.5 rounded border border-amber-850/20 transition-colors"
+                          title="Kiểm duyệt các tài liệu của nhóm này"
+                        >
+                          <Eye className="h-3 w-3" /> Tài liệu
+                        </Link>
+                      </div>
                     ) : (
                       <span className="text-xs font-bold text-slate-400 bg-slate-800 px-2.5 py-1 rounded-lg">
                         Đối tượng không xác định
@@ -195,16 +223,27 @@ const AdminReportsPage = () => {
                       {report.reason}
                     </p>
                   </div>
+
+                  {/* Resolution Notes display */}
+                  {report.resolutionNotes && (
+                    <div className="flex gap-2.5 items-start pl-6">
+                      <ShieldCheck className="h-4 w-4 text-emerald-450 shrink-0 mt-0.5" />
+                      <div className="text-xs font-semibold text-emerald-355 leading-relaxed bg-emerald-950/20 p-3.5 rounded-2xl border border-emerald-900/20 w-full max-w-3xl">
+                        <span className="font-bold block text-[10px] text-emerald-400 uppercase tracking-wider mb-1">Ghi chú giải quyết của Admin:</span>
+                        {report.resolutionNotes}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Right Side: Status badge & Action buttons */}
                 <div className="flex flex-row md:flex-col items-center md:items-end justify-between md:justify-end gap-3 self-stretch md:self-auto shrink-0 border-t md:border-t-0 pt-4 md:pt-0 border-slate-800">
                   {report.status === 'PENDING' ? (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-950/60 text-amber-400 border border-amber-800/30 animate-pulse animate-duration-1000">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-amber-955/60 text-amber-405 border border-amber-850/30 animate-pulse animate-duration-1000">
                       Đang chờ xử lý
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-950/60 text-emerald-450 border border-emerald-800/30">
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-955/60 text-emerald-400 border border-emerald-800/30">
                       <ShieldCheck className="h-3.5 w-3.5" />
                       Đã giải quyết
                     </span>
@@ -236,9 +275,8 @@ const AdminReportsPage = () => {
 
                     {report.status === 'PENDING' && (
                       <button
-                        onClick={() => handleResolveReport(report.id)}
-                        disabled={resolvingId === report.id}
-                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold border-0 shadow-lg shadow-indigo-650/10 cursor-pointer flex items-center gap-1.5 transition-colors"
+                        onClick={() => setNoteModalReport(report)}
+                        className="px-3.5 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold border-0 shadow-lg shadow-indigo-650/10 cursor-pointer flex items-center gap-1.5 transition-colors"
                       >
                         <Check className="h-3.5 w-3.5" />
                         Giải quyết
@@ -277,6 +315,54 @@ const AdminReportsPage = () => {
           </div>
         )}
       </div>
+
+      {/* Resolution Notes Modal */}
+      {noteModalReport && (
+        <div className="fixed inset-0 z-50 bg-slate-955/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl p-6 space-y-4 animate-in scale-in duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+              <h3 className="text-base font-bold text-white">Lý do & Ghi chú giải quyết</h3>
+              <button
+                onClick={() => setNoteModalReport(null)}
+                className="p-1.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-lg border-0 bg-transparent cursor-pointer"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <p className="text-xs text-slate-450 leading-relaxed">
+              Vui lòng bổ sung ghi chú/lý do giải quyết báo cáo này để lưu lại nhật ký vi phạm cho hệ thống.
+            </p>
+
+            <div className="space-y-1.5">
+              <textarea
+                rows={4}
+                value={notesText}
+                onChange={(e) => setNotesText(e.target.value)}
+                placeholder="Nhập ghi chú xử lý (ví dụ: Đã nhắc nhở thành viên/Khóa tài khoản vì chia sẻ học liệu vi phạm)..."
+                className="w-full bg-slate-950 border border-slate-850 rounded-xl py-2.5 px-4 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors resize-none font-semibold leading-relaxed"
+              />
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <button
+                onClick={() => setNoteModalReport(null)}
+                className="px-4 py-2.5 bg-slate-950 hover:bg-slate-850 text-slate-400 rounded-xl text-xs font-bold border border-slate-855 cursor-pointer"
+              >
+                Hủy bỏ
+              </button>
+              <button
+                onClick={handleResolveReport}
+                disabled={resolvingId === noteModalReport.id}
+                className="px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-xl text-xs font-bold border-0 cursor-pointer flex items-center gap-1.5"
+              >
+                {resolvingId === noteModalReport.id && <Loader2 className="h-3 w-3 animate-spin" />}
+                Xác nhận giải quyết
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

@@ -1,6 +1,6 @@
 import { useState, memo } from 'react';
 import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Users, ShieldAlert, AlertOctagon, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Users, ShieldAlert, AlertOctagon, LogOut, Menu, X, Settings, FileText } from 'lucide-react';
 import { useAdminAuthStore } from '../store/useAdminAuthStore';
 import { cn } from '../lib/utils';
 
@@ -8,7 +8,9 @@ const ADMIN_NAV_ITEMS = [
   { to: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/admin/users', label: 'Quản lý Users', icon: Users },
   { to: '/admin/groups', label: 'Quản lý Groups', icon: ShieldAlert },
+  { to: '/admin/documents', label: 'Quản lý Tài liệu', icon: FileText },
   { to: '/admin/reports', label: 'Báo cáo vi phạm', icon: AlertOctagon },
+  { to: '/admin/settings', label: 'Cài đặt hệ thống', icon: Settings },
 ];
 
 interface SidebarProps {
@@ -98,7 +100,7 @@ const AdminLayout = () => {
 
   const handleLogout = () => {
     logout();
-    navigate('/admin/login');
+    window.location.replace('/admin/login');
   };
 
   const closeMobile = () => setIsMobileOpen(false);
