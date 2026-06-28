@@ -545,7 +545,70 @@ export const deleteMessage = async (req: Request, res: Response) => {
 //[PATCH] /chat/messages/:msgId/pin — toggle pin tin nhắn chat 1-1
 export const pinChatMessage = async (req: Request, res: Response) => {
   try {
-    return res.status(400).json({ code: 400, message: "Tính năng ghim tin nhắn đang được phát triển" });
+    const myId = (req as any).user.id;
+    const messageId = req.params.msgId as string;
+
+    const message = await prisma.message.findUnique({
+      where: { id: messageId }
+    });
+
+    if (!message) {
+      return res.status(404).json({ code: 404, message: "Không tìm thấy tin nhắn" });
+    }
+
+    if (message.senderId !== myId && message.receiverId !== myId) {
+      return res.status(403).json({ code: 403, message: "Bạn không có quyền ghim tin nhắn này" });
+    }
+
+    const updated = await prisma.message.update({
+      where: { id: messageId },
+      data: {
+        isPinned: !message.isPinned,
+        pinnedAt: message.isPinned ? null : new Date(),
+        pinnedBy: message.isPinned ? null : myId
+      },
+      include: {
+        sender: { select: { id: true, name: true, avatarUrl: true } }
+      }
+    });
+
+    const io = req.app.get("io");
+    if (io) {
+      const targetId = message.senderId === myId ? message.receiverId : message.senderId;
+      if (targetId) {
+        // Emit to receiver
+        io.to(targetId).emit("chat:message_pinned", {
+          messageId,
+          message: {
+            ...updated,
+            conversationId: myId,
+            type: updated.type.toLowerCase()
+          },
+          isPinned: updated.isPinned,
+          conversationId: myId
+        });
+        // Emit to sender
+        io.to(myId).emit("chat:message_pinned", {
+          messageId,
+          message: {
+            ...updated,
+            conversationId: targetId,
+            type: updated.type.toLowerCase()
+          },
+          isPinned: updated.isPinned,
+          conversationId: targetId
+        });
+      }
+    }
+
+    return res.status(200).json({
+      code: 200,
+      message: updated.isPinned ? "Ghim tin nhắn thành công" : "Bỏ ghim tin nhắn thành công",
+      data: {
+        ...updated,
+        type: updated.type.toLowerCase()
+      }
+    });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }
@@ -554,7 +617,34 @@ export const pinChatMessage = async (req: Request, res: Response) => {
 //[GET] /chat/conversations/:conversationId/messages/pinned
 export const getPinnedChatMessages = async (req: Request, res: Response) => {
   try {
-    return res.status(200).json({ code: 200, message: "Lấy danh sách tin nhắn ghim thành công", data: [] });
+    const myId = (req as any).user.id;
+    const conversationId = req.params.conversationId as string;
+
+    const messages = await prisma.message.findMany({
+      where: {
+        OR: [
+          { senderId: myId, receiverId: conversationId },
+          { senderId: conversationId, receiverId: myId }
+        ],
+        isPinned: true
+      },
+      orderBy: { pinnedAt: "desc" },
+      include: {
+        sender: { select: { id: true, name: true, avatarUrl: true } }
+      }
+    });
+
+    const formattedMessages = messages.map(m => ({
+      ...m,
+      conversationId: m.senderId === myId ? (m.receiverId as string) : m.senderId,
+      type: m.type.toLowerCase() as any
+    }));
+
+    return res.status(200).json({
+      code: 200,
+      message: "Lấy danh sách tin nhắn ghim thành công",
+      data: formattedMessages
+    });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }
@@ -604,7 +694,32 @@ export const sendGroupMessage = async (req: Request, res: Response) => {
 //[PATCH] /chat/groups/:groupId/messages/:msgId/pin  — toggle pin
 export const pinGroupMessage = async (req: Request, res: Response) => {
   try {
-    return res.status(400).json({ code: 400, message: "Tính năng ghim tin nhắn đang được phát triển" });
+    const myId = (req as any).user.id;
+    const groupId = req.params.groupId as string;
+    const msgId = req.params.msgId as string;
+
+    const result = await togglePinMessageService(groupId, msgId, myId);
+
+    const io = req.app.get("io");
+    if (io) {
+      io.to(`group:${groupId}`).emit("group:message_pinned", {
+        groupId,
+        message: {
+          ...result.data,
+          type: result.data.type.toLowerCase()
+        },
+        isPinned: result.data.isPinned
+      });
+    }
+
+    return res.status(200).json({
+      code: 200,
+      message: result.message,
+      data: {
+        ...result.data,
+        type: result.data.type.toLowerCase()
+      }
+    });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }
@@ -616,7 +731,11 @@ export const getGroupPinnedMessages = async (req: Request, res: Response) => {
     const myId = (req as any).user.id;
     const groupId = req.params.groupId as string;
     const result = await getPinnedMessagesService(groupId, myId);
-    return res.status(200).json({ code: 200, message: result.message, data: result.data });
+    const formatted = (result.data || []).map((m: any) => ({
+      ...m,
+      type: m.type.toLowerCase()
+    }));
+    return res.status(200).json({ code: 200, message: result.message, data: formatted });
   } catch (error: any) {
     return res.status(400).json({ code: 400, message: `Lỗi: ${error.message}` });
   }

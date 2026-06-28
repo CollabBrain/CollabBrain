@@ -131,7 +131,12 @@ export const getGroupHistoryService = async (groupId: string, userId: string, pa
     take: limit,
     skip: (page - 1) * limit,
     include: {
-      sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
+      sender: { select: { id: true, name: true, avatarUrl: true, email: true } },
+      replyTo: {
+        include: {
+          sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
+        }
+      }
     }
   });
 
@@ -139,7 +144,37 @@ export const getGroupHistoryService = async (groupId: string, userId: string, pa
 };
 
 export const togglePinMessageService = async (groupId: string, messageId: string, userId: string) => {
-  throw new Error("Tính năng ghim tin nhắn đang được phát triển");
+  const member = await prisma.groupMember.findUnique({
+    where: { groupId_userId: { groupId, userId } }
+  });
+  if (!member) throw new Error("Bạn không phải thành viên của nhóm này");
+  if (member.role !== "OWNER") {
+    throw new Error("Chỉ chủ nhóm mới có quyền ghim tin nhắn");
+  }
+
+  const message = await prisma.message.findUnique({
+    where: { id: messageId }
+  });
+  if (!message || message.groupId !== groupId) {
+    throw new Error("Không tìm thấy tin nhắn trong nhóm này");
+  }
+
+  const updated = await prisma.message.update({
+    where: { id: messageId },
+    data: {
+      isPinned: !message.isPinned,
+      pinnedAt: message.isPinned ? null : new Date(),
+      pinnedBy: message.isPinned ? null : userId
+    },
+    include: {
+      sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
+    }
+  });
+
+  return {
+    message: updated.isPinned ? "Ghim tin nhắn thành công" : "Bỏ ghim tin nhắn thành công",
+    data: updated
+  };
 };
 
 export const getPinnedMessagesService = async (groupId: string, userId: string) => {
@@ -147,7 +182,16 @@ export const getPinnedMessagesService = async (groupId: string, userId: string) 
     where: { groupId_userId: { groupId, userId } }
   });
   if (!member) throw new Error("Bạn không phải thành viên của nhóm này");
-  return { data: [], message: "Lấy danh sách tin nhắn đã ghim thành công" };
+
+  const messages = await prisma.message.findMany({
+    where: { groupId, isPinned: true },
+    orderBy: { pinnedAt: "desc" },
+    include: {
+      sender: { select: { id: true, name: true, avatarUrl: true, email: true } }
+    }
+  });
+
+  return { data: messages, message: "Lấy danh sách tin nhắn đã ghim thành công" };
 };
 
 export const recallGroupMessageService = async (groupId: string, messageId: string, userId: string) => {
