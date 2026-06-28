@@ -96,7 +96,8 @@ export const getExploreDecks = async (req: Request, res: Response) => {
 export const getDeckById = async (req: Request, res: Response) => {
   try {
     const deckId = str(req.params.deckId);
-    const result = await getDeckByIdService(deckId);
+    const userId = (req as any).user?.id;
+    const result = await getDeckByIdService(deckId, userId);
     return res.status(200).json({
       code: 200,
       message: result.message,
@@ -213,10 +214,11 @@ export const createBulkFlashcards = async (req: Request, res: Response) => {
 export const getDeckCards = async (req: Request, res: Response) => {
   try {
     const deckId = str(req.params.deckId);
+    const userId = (req as any).user?.id;
     const page = Math.max(1, parseInt(req.query.page as string) || 1);
     const limit = Math.min(100, Math.max(1, parseInt(req.query.limit as string) || 50));
 
-    const result = await getDeckCardsService(deckId, page, limit);
+    const result = await getDeckCardsService(deckId, userId, page, limit);
     return res.status(200).json({
       code: 200,
       message: result.message,
@@ -302,7 +304,7 @@ export const deleteFlashcard = async (req: Request, res: Response) => {
 //[GET] /flashcard/decks/:deckId/study
 export const getStudyCards = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
     const deckId = str(req.params.deckId);
     const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string) || 20));
 
@@ -323,7 +325,7 @@ export const getStudyCards = async (req: Request, res: Response) => {
 //[GET] /flashcard/decks/:deckId/stats
 export const getDeckStats = async (req: Request, res: Response) => {
   try {
-    const userId = (req as any).user.id;
+    const userId = (req as any).user?.id;
     const deckId = str(req.params.deckId);
 
     const result = await getDeckStatsService(deckId, userId);
