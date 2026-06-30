@@ -161,80 +161,113 @@ export const StudyCard = ({
         </div>
       </div>
 
-      {/* Card */}
-      <Card
-        className={cn(
-          "min-h-[320px] flex flex-col cursor-pointer transition-all duration-300",
-          "border-2 hover:shadow-xl",
-          isFlipped ? "border-primary" : "border-transparent"
-        )}
-        onClick={!isFlipped ? onFlip : undefined}
-      >
-        {/* Card Header */}
-        <div className="flex items-center justify-between p-4 border-b">
-          <div className="flex items-center gap-2">
-            {!isFlipped ? (
-              <>
+      {/* 3D Flip Card Container */}
+      <div className="w-full h-[360px] [perspective:1000px] select-none relative mb-6">
+        <div
+          className={cn(
+            "relative w-full h-full transition-all duration-700 [transform-style:preserve-3d]",
+            isFlipped ? "[transform:rotateY(180deg)]" : ""
+          )}
+        >
+          {/* FRONT SIDE (Câu hỏi) */}
+          <Card
+            className="absolute inset-0 w-full h-full flex flex-col justify-between cursor-pointer border-2 hover:shadow-xl [backface-visibility:hidden] bg-card text-card-foreground rounded-2xl"
+            onClick={onFlip}
+          >
+            {/* Card Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-2">
                 <Eye className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">
-                  Nhấn để xem đáp án
+                <span className="text-xs text-muted-foreground font-semibold">
+                  Mặt trước - Câu hỏi (Nhấn để xem đáp án)
                 </span>
-              </>
-            ) : (
-              <>
-                <Check className="w-4 h-4 text-primary" />
-                <span className="text-sm text-primary">Đáp án</span>
-              </>
-            )}
-          </div>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              onFlip();
-            }}
-            className="gap-2"
-          >
-            <FlipIcon />
-            Lật thẻ
-          </Button>
-        </div>
+              </div>
+              
+              <span
+                className={cn(
+                  "px-2 py-1 text-xs rounded-full font-semibold",
+                  currentCard.difficulty === "EASY" && "bg-green-100 text-green-700 dark:bg-green-950 dark:text-green-300",
+                  currentCard.difficulty === "MEDIUM" && "bg-yellow-100 text-yellow-700 dark:bg-yellow-950 dark:text-yellow-300",
+                  currentCard.difficulty === "HARD" && "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300"
+                )}
+              >
+                {currentCard.difficulty === "EASY"
+                  ? "Dễ"
+                  : currentCard.difficulty === "MEDIUM"
+                  ? "Trung bình"
+                  : "Khó"}
+              </span>
+            </div>
 
-        {/* Card Content */}
-        <div className="flex-1 flex items-center justify-center p-6">
-          <div className="text-center">
-            <p className="text-xl font-medium whitespace-pre-wrap">
-              {isFlipped ? currentCard.back : currentCard.front}
-            </p>
-
-            {!isFlipped && currentCard.hint && (
-              <p className="text-sm text-muted-foreground mt-4 italic">
-                Gợi ý: {currentCard.hint}
+            {/* Card Content */}
+            <div className="flex-1 flex flex-col items-center justify-center p-6">
+              <p className="text-xl font-bold whitespace-pre-wrap text-center max-w-md">
+                {currentCard.front}
               </p>
-            )}
-          </div>
-        </div>
 
-        {/* Difficulty Badge */}
-        <div className="absolute top-4 right-4">
-          <span
-            className={cn(
-              "px-2 py-1 text-xs rounded-full",
-              currentCard.difficulty === "EASY" && "bg-green-100 text-green-700",
-              currentCard.difficulty === "MEDIUM" &&
-                "bg-yellow-100 text-yellow-700",
-              currentCard.difficulty === "HARD" && "bg-red-100 text-red-700"
-            )}
+              {currentCard.hint && (
+                <p className="text-sm text-muted-foreground mt-4 italic bg-slate-100 dark:bg-slate-800/50 px-3 py-1.5 rounded-lg border border-slate-200/50 dark:border-slate-700/50">
+                  Gợi ý: {currentCard.hint}
+                </p>
+              )}
+            </div>
+
+            {/* Card Footer */}
+            <div className="flex justify-center p-4 border-t bg-slate-50/50 dark:bg-slate-900/10 rounded-b-2xl">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFlip();
+                }}
+                className="gap-2 text-primary"
+              >
+                <FlipIcon />
+                Lật thẻ
+              </Button>
+            </div>
+          </Card>
+
+          {/* BACK SIDE (Đáp án) */}
+          <Card
+            className="absolute inset-0 w-full h-full flex flex-col justify-between cursor-pointer border-2 border-primary/20 hover:shadow-xl [backface-visibility:hidden] [transform:rotateY(180deg)] bg-card text-card-foreground rounded-2xl shadow-[0_10px_30px_rgba(99,102,241,0.05)]"
+            onClick={onFlip}
           >
-            {currentCard.difficulty === "EASY"
-              ? "Dễ"
-              : currentCard.difficulty === "MEDIUM"
-              ? "Trung bình"
-              : "Khó"}
-          </span>
+            {/* Card Header */}
+            <div className="flex items-center justify-between p-4 border-b">
+              <div className="flex items-center gap-2">
+                <Check className="w-4 h-4 text-primary" />
+                <span className="text-xs text-primary font-semibold">
+                  Mặt sau - Đáp án
+                </span>
+              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onFlip();
+                }}
+                className="gap-1 text-muted-foreground h-7 px-2"
+              >
+                <FlipIcon />
+                Lật lại
+              </Button>
+            </div>
+
+            {/* Card Content */}
+            <div className="flex-1 flex items-center justify-center p-6 bg-indigo-50/10 dark:bg-indigo-950/5">
+              <p className="text-xl font-bold text-primary whitespace-pre-wrap text-center max-w-md">
+                {currentCard.back}
+              </p>
+            </div>
+
+            {/* Empty space aligning style with Front side */}
+            <div className="h-[60px] rounded-b-2xl border-t border-transparent" />
+          </Card>
         </div>
-      </Card>
+      </div>
 
       {/* Review Buttons - Only show when flipped */}
       {isFlipped && (
