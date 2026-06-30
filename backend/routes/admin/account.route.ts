@@ -6,11 +6,12 @@ import {
   validateCreateAccount,
   validateUpdateAccount
 } from "../../validates/admin/account.validate";
-import { adminAuthMiddleware } from "../../middlewares/admin/auth.middleware";
+import { adminAuthMiddleware, requireRoles } from "../../middlewares/admin/auth.middleware";
 
 const router = Router();
 
 router.use(adminAuthMiddleware);
+router.use(requireRoles(["ADMIN"]));
 
 router.get("/", validateGetAccounts, controller.getAccounts);
 router.get("/:id", validateAccountId, controller.getAccountById);
