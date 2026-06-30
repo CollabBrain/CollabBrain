@@ -1,5 +1,5 @@
 import { useState, memo } from 'react';
-import { Outlet, Link, useNavigate, useLocation } from 'react-router-dom';
+import { Outlet, Link, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import { LayoutDashboard, Users, ShieldAlert, AlertOctagon, LogOut, Menu, X, Settings, FileText } from 'lucide-react';
 import { useAdminAuthStore } from '../store/useAdminAuthStore';
 import { cn } from '../lib/utils';
@@ -21,23 +21,50 @@ interface SidebarProps {
 
 const AdminSidebarContent = memo(({ pathname, onNavClick, onLogout }: SidebarProps) => {
   const isActive = (path: string) => pathname.startsWith(path);
+  const role = useAdminAuthStore((s) => s.role);
+
+  const getRoleInfo = (r: string | null) => {
+    switch (r) {
+      case 'ADMIN':
+        return { name: 'Quản trị viên', badge: 'Admin Portal', initial: 'AD' };
+      case 'MANAGER':
+        return { name: 'Quản lý', badge: 'Manager Portal', initial: 'MN' };
+      case 'STAFF':
+        return { name: 'Nhân viên kiểm duyệt', badge: 'Moderator Portal', initial: 'ST' };
+      default:
+        return { name: 'Administrator', badge: 'Admin Portal', initial: 'AD' };
+    }
+  };
+
+  const roleInfo = getRoleInfo(role);
+  const logoLink = role === 'STAFF' ? '/admin/users' : '/admin/dashboard';
+
+  const visibleNavItems = ADMIN_NAV_ITEMS.filter(({ to }) => {
+    if (role === 'STAFF') {
+      return ['/admin/users', '/admin/groups', '/admin/documents', '/admin/reports'].includes(to);
+    }
+    if (role === 'MANAGER') {
+      return to !== '/admin/settings';
+    }
+    return true;
+  });
 
   return (
     <div className="flex flex-col h-full bg-slate-900 text-slate-100 p-6 justify-between select-none">
       <div className="space-y-8">
         {/* Logo Admin */}
         <div className="flex flex-col gap-0.5 px-2">
-          <Link to="/admin/dashboard" className="text-2xl font-black text-indigo-400 tracking-tight flex items-center gap-1.5 hover:opacity-90">
+          <Link to={logoLink} className="text-2xl font-black text-indigo-400 tracking-tight flex items-center gap-1.5 hover:opacity-90">
             CollabBrain
           </Link>
           <span className="text-[9px] uppercase font-bold text-slate-400 tracking-widest pl-0.5">
-            Admin Portal
+            {roleInfo.badge}
           </span>
         </div>
 
         {/* Navigation Menu */}
         <nav className="flex flex-col gap-1.5">
-          {ADMIN_NAV_ITEMS.map(({ to, label, icon: Icon }) => {
+          {visibleNavItems.map(({ to, label, icon: Icon }) => {
             const active = isActive(to);
             return (
               <Link
@@ -66,11 +93,11 @@ const AdminSidebarContent = memo(({ pathname, onNavClick, onLogout }: SidebarPro
       <div className="space-y-4 pt-4 border-t border-slate-800">
         <div className="flex items-center gap-3 p-2 rounded-xl">
           <div className="w-10 h-10 rounded-full bg-indigo-600 flex items-center justify-center font-bold text-white shadow-sm">
-            AD
+            {roleInfo.initial}
           </div>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-bold text-slate-200 truncate">
-              Administrator
+              {roleInfo.name}
             </p>
             <p className="text-xs font-semibold text-slate-400 truncate">
               Hệ thống quản lý
@@ -93,7 +120,7 @@ const AdminSidebarContent = memo(({ pathname, onNavClick, onLogout }: SidebarPro
 AdminSidebarContent.displayName = 'AdminSidebarContent';
 
 const AdminLayout = () => {
-  const { logout } = useAdminAuthStore();
+  const { logout, role } = useAdminAuthStore();
   const navigate = useNavigate();
   const { pathname } = useLocation();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
@@ -104,6 +131,22 @@ const AdminLayout = () => {
   };
 
   const closeMobile = () => setIsMobileOpen(false);
+
+  // Guard against unauthorized route access
+  const isAllowedPath = (path: string, currentRole: string | null) => {
+    if (path.startsWith('/admin/settings') && currentRole !== 'ADMIN') {
+      return false;
+    }
+    if (path.startsWith('/admin/dashboard') && currentRole === 'STAFF') {
+      return false;
+    }
+    return true;
+  };
+
+  if (!isAllowedPath(pathname, role)) {
+    const redirectPath = role === 'STAFF' ? '/admin/users' : '/admin/dashboard';
+    return <Navigate to={redirectPath} replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-950 flex flex-col md:flex-row overflow-hidden font-sans text-slate-200">

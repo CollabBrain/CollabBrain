@@ -38,7 +38,8 @@ export const createDeck = async (
 
 // Helper: check if user has access to a deck
 const hasDeckAccess = async (deck: { id: string; createdBy: string; isPublic: boolean; groupId: string | null }, userId?: string) => {
-  if (!userId) return deck.isPublic;
+  if (deck.isPublic) return true;
+  if (!userId) return false;
   if (deck.createdBy === userId) return true;
   
   const share = await prisma.deckShare.findFirst({

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import adminAxiosInstance from '../../services/adminAxiosInstance';
 import { Search, Edit2, Lock, Unlock, Trash2, ShieldAlert, X, Check, Loader2 } from 'lucide-react';
+import RichTextEditor from '../../components/common/RichTextEditor';
 
 interface User {
   id: string;
@@ -363,7 +364,7 @@ const AdminUsersPage = () => {
       {/* Edit User Modal */}
       {editingUser && (
         <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl animate-in scale-in duration-200">
+          <div className="w-full max-w-2xl bg-slate-900 border border-slate-800 rounded-3xl overflow-hidden shadow-2xl animate-in scale-in duration-200">
             <div className="p-6 border-b border-slate-850 flex items-center justify-between">
               <h3 className="text-lg font-bold text-white">Chỉnh sửa thông tin</h3>
               <button
@@ -385,12 +386,10 @@ const AdminUsersPage = () => {
               </div>
               <div className="space-y-1.5">
                 <label className="text-xs font-bold text-slate-400 uppercase tracking-wider pl-1">Tiểu sử (Bio)</label>
-                <textarea
-                  rows={3}
+                <RichTextEditor
                   value={editBio}
-                  onChange={(e) => setEditBio(e.target.value)}
+                  onChange={(content) => setEditBio(content)}
                   placeholder="Nhập giới thiệu..."
-                  className="w-full bg-slate-950 border border-slate-850 rounded-xl py-2.5 px-4 text-sm text-slate-200 focus:outline-none focus:border-indigo-500 transition-colors resize-none"
                 />
               </div>
 
