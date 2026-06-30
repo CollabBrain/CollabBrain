@@ -48,14 +48,7 @@ export const adminAuthMiddleware = async (req: Request, res: Response, next: Nex
       });
     }
 
-    // Check if role is admin
-    if (account.role !== "ADMIN") {
-      return res.status(403).json({
-        success: false,
-        message: "Bạn không có quyền truy cập trang này"
-      });
-    }
-
+    // Check if role is admin/manager/staff (any authenticated account is allowed in base middleware)
     (req as any).admin = account;
     next();
   } catch (error) {
@@ -64,4 +57,25 @@ export const adminAuthMiddleware = async (req: Request, res: Response, next: Nex
       message: "Token không hợp lệ hoặc đã hết hạn"
     });
   }
+};
+
+export const requireRoles = (allowedRoles: string[]) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const admin = (req as any).admin;
+    if (!admin) {
+      return res.status(401).json({
+        success: false,
+        message: "Bạn chưa đăng nhập hoặc phiên đăng nhập đã hết hạn"
+      });
+    }
+
+    if (!allowedRoles.includes(admin.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Bạn không có quyền thực hiện hành động này"
+      });
+    }
+
+    next();
+  };
 };
