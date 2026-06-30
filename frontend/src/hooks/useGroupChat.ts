@@ -28,48 +28,7 @@ interface UseGroupChatOptions {
   isVisible?: boolean;
 }
 
-interface ToastOptions {
-  message: string;
-  type?: 'info' | 'success' | 'error';
-  duration?: number;
-}
 
-/** Hiển thị toast nhẹ trong ứng dụng (không cần thư viện) */
-const showInAppToast = ({ message, type = 'info', duration = 4000 }: ToastOptions) => {
-  const existing = document.getElementById('group-chat-toast');
-  if (existing) existing.remove();
-
-  const toast = document.createElement('div');
-  toast.id = 'group-chat-toast';
-  const bgColor = type === 'error' ? '#ef4444' : type === 'success' ? '#10b981' : '#6366f1';
-  toast.style.cssText = `
-    position: fixed; bottom: 24px; right: 24px; z-index: 9999;
-    background: ${bgColor}; color: white;
-    padding: 12px 18px; border-radius: 12px;
-    font-size: 14px; font-weight: 500;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.18);
-    max-width: 320px; word-break: break-word;
-    animation: slideInRight 0.3s ease;
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  `;
-
-  // Inject animation nếu chưa có
-  if (!document.getElementById('toast-style')) {
-    const style = document.createElement('style');
-    style.id = 'toast-style';
-    style.textContent = `
-      @keyframes slideInRight {
-        from { transform: translateX(120%); opacity: 0; }
-        to { transform: translateX(0); opacity: 1; }
-      }
-    `;
-    document.head.appendChild(style);
-  }
-
-  toast.textContent = message;
-  document.body.appendChild(toast);
-  setTimeout(() => toast.remove(), duration);
-};
 
 export const useGroupChat = ({
   groupId,
@@ -147,11 +106,14 @@ export const useGroupChat = ({
           : message.content.length > 60
             ? message.content.slice(0, 60) + '...'
             : message.content;
-        showInAppToast({
-          message: `💬 ${senderName} trong ${groupName}: ${preview}`,
-          type: 'info',
-          duration: 5000
-        });
+        
+        window.dispatchEvent(new CustomEvent('app-notification', {
+          detail: {
+            title: senderName,
+            message: `[Nhóm] ${preview}`,
+            type: 'group'
+          }
+        }));
       }
     };
 
@@ -246,7 +208,13 @@ export const useGroupChat = ({
       await togglePinMessageApi(groupId, msgId);
       // Store sẽ được cập nhật qua socket event group:message_pinned
     } catch (err: any) {
-      showInAppToast({ message: err?.response?.data?.message || 'Pin thất bại', type: 'error' });
+      window.dispatchEvent(new CustomEvent('app-notification', {
+        detail: {
+          title: 'Lỗi Pin tin nhắn',
+          message: err?.response?.data?.message || 'Pin thất bại',
+          type: 'error'
+        }
+      }));
     }
   }, [groupId]);
 
@@ -263,7 +231,13 @@ export const useGroupChat = ({
       await deleteGroupMessageApi(groupId, msgId);
       useGroupChatStore.getState().removeMessage(groupId, msgId);
     } catch (err: any) {
-      showInAppToast({ message: err?.response?.data?.message || 'Xóa thất bại', type: 'error' });
+      window.dispatchEvent(new CustomEvent('app-notification', {
+        detail: {
+          title: 'Lỗi Xóa tin nhắn',
+          message: err?.response?.data?.message || 'Xóa thất bại',
+          type: 'error'
+        }
+      }));
     }
   }, [groupId]);
 
@@ -290,7 +264,13 @@ export const useGroupChat = ({
       }
       return result;
     } catch (err: any) {
-      showInAppToast({ message: err?.response?.data?.message || 'Upload thất bại', type: 'error' });
+      window.dispatchEvent(new CustomEvent('app-notification', {
+        detail: {
+          title: 'Lỗi Upload tài liệu',
+          message: err?.response?.data?.message || 'Upload thất bại',
+          type: 'error'
+        }
+      }));
       return null;
     }
   }, [groupId]);

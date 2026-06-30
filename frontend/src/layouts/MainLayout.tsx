@@ -225,20 +225,56 @@ const MainLayout = () => {
     const socket = getSocket();
     if (!socket) return;
 
-    const handleNewFriendRequest = () => {
+    const handleNewFriendRequest = (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['friend-requests', 'received'] });
+      if (isNotifEnabled && isFriendEnabled) {
+        window.dispatchEvent(new CustomEvent('app-notification', {
+          detail: {
+            title: 'Hệ thống Bạn bè',
+            message: data?.message || 'Bạn có một lời mời kết bạn mới',
+            type: 'friend'
+          }
+        }));
+      }
     };
 
-    const handleAcceptFriendRequest = () => {
+    const handleAcceptFriendRequest = (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['friends'] });
+      if (isNotifEnabled && isFriendEnabled) {
+        window.dispatchEvent(new CustomEvent('app-notification', {
+          detail: {
+            title: 'Hệ thống Bạn bè',
+            message: data?.message || 'Lời mời kết bạn đã được chấp nhận',
+            type: 'friend'
+          }
+        }));
+      }
     };
 
-    const handleNewGroupInvitation = () => {
+    const handleNewGroupInvitation = (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['group-invitations'] });
+      if (isNotifEnabled && isGroupEnabled) {
+        window.dispatchEvent(new CustomEvent('app-notification', {
+          detail: {
+            title: 'Hệ thống Nhóm',
+            message: data?.message || 'Bạn có một lời mời vào nhóm mới',
+            type: 'group'
+          }
+        }));
+      }
     };
 
-    const handleNewGroupJoinRequest = () => {
+    const handleNewGroupJoinRequest = (data: any) => {
       queryClient.invalidateQueries({ queryKey: ['group-invitations'] });
+      if (isNotifEnabled && isGroupEnabled) {
+        window.dispatchEvent(new CustomEvent('app-notification', {
+          detail: {
+            title: 'Hệ thống Nhóm',
+            message: data?.message || 'Có yêu cầu tham gia nhóm mới',
+            type: 'group'
+          }
+        }));
+      }
     };
 
     const handleGroupNewMessage = ({ groupId, message }: { groupId: string; message: any }) => {
@@ -254,6 +290,63 @@ const MainLayout = () => {
       const isFromMe = message.senderId === myId;
       if (groupId !== activeGroupId && !isFromMe) {
         useGroupChatStore.getState().incrementUnread(groupId);
+
+        if (isNotifEnabled && isGroupEnabled) {
+          const senderName = message.sender?.name || 'Ai đó';
+          const preview = message.content.length > 50 
+            ? message.content.slice(0, 50) + '...' 
+            : message.content;
+          window.dispatchEvent(new CustomEvent('app-notification', {
+            detail: {
+              title: senderName,
+              message: `[Nhóm] ${preview}`,
+              type: 'group'
+            }
+          }));
+        }
+      }
+    };
+
+    const handleChatNewMessage = ({ message }: { message: any }) => {
+      const pathMatch = window.location.pathname.match(/^\/chat\/([^/]+)/);
+      const activeConvId = pathMatch ? pathMatch[1] : null;
+
+      let myId = '';
+      try {
+        const payload = JSON.parse(atob(accessToken.split('.')[1]));
+        myId = payload.id ?? payload.sub ?? payload.userId ?? '';
+      } catch {}
+
+      const isFromMe = message.senderId === myId;
+      if (message.conversationId !== activeConvId && !isFromMe) {
+        // Sync Zustand store
+        const state = useChatStore.getState();
+        const conv = state.conversations.find((c) => c.id === message.conversationId);
+        if (conv) {
+          state.addOrUpdateConversation({
+            ...conv,
+            lastMessage: message,
+            updatedAt: message.createdAt,
+            unreadCount: conv.unreadCount + 1,
+          });
+        } else {
+          queryClient.invalidateQueries({ queryKey: ['chat', 'conversations'] });
+        }
+
+        // Trigger notification
+        if (isNotifEnabled && isChatEnabled) {
+          const senderName = message.sender?.name || 'Tin nhắn riêng';
+          const preview = message.content.length > 50 
+            ? message.content.slice(0, 50) + '...' 
+            : message.content;
+          window.dispatchEvent(new CustomEvent('app-notification', {
+            detail: {
+              title: senderName,
+              message: preview,
+              type: 'chat'
+            }
+          }));
+        }
       }
     };
 
@@ -262,6 +355,7 @@ const MainLayout = () => {
     socket.on('new_group_invitation', handleNewGroupInvitation);
     socket.on('new_group_join_request', handleNewGroupJoinRequest);
     socket.on('group:new_message', handleGroupNewMessage);
+    socket.on('chat:new_message', handleChatNewMessage);
 
     return () => {
       socket.off('new_request_friend', handleNewFriendRequest);
@@ -269,6 +363,7 @@ const MainLayout = () => {
       socket.off('new_group_invitation', handleNewGroupInvitation);
       socket.off('new_group_join_request', handleNewGroupJoinRequest);
       socket.off('group:new_message', handleGroupNewMessage);
+      socket.off('chat:new_message', handleChatNewMessage);
     };
   }, [accessToken, queryClient]);
 
