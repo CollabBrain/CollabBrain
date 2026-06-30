@@ -12,10 +12,14 @@ post {
 
 body:json {
   {
-    "email": {{email}},
-    "otp": "123456"
+    "email": "{{email}}",
+    "otp": "{{otp}}",
+    "password": "{{password}}",
+    "name": "{{name}}"
   }
 }
+
+
 
 docs {
   # Verify OTP - Register
