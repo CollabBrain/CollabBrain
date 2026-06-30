@@ -1,0 +1,38 @@
+meta {
+  name: Verify OTP - Wrong Code
+  type: http
+  seq: 5
+}
+
+post {
+  url: {{baseUrl}}/user/register/verify-otp
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": {{email}},
+    "otp": "000000"
+  }
+}
+
+docs {
+  # Verify OTP - Wrong Code
+
+  ## Test Case: UC02-Register-006 - Xác thực OTP với mã sai
+
+  ### Request
+  - **URL**: POST {{baseUrl}}/user/register/verify-otp
+  - **Body**:
+    - `email`: Email đã đăng ký
+    - `otp`: Mã OTP sai
+
+  ### Expected Response (400)
+  ```json
+  {
+    "code": 400,
+    "message": "Mã OTP không chính xác"
+  }
+  ```
+}

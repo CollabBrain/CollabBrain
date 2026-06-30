@@ -1,0 +1,57 @@
+meta {
+  name: Refresh Token
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/user/refresh
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "refreshToken": "{{refreshToken}}"
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    var data = res.getBody();
+    if (data.data && data.data.accessToken) {
+      bru.setVar("accessToken", data.data.accessToken);
+    }
+    if (data.data && data.data.refreshToken) {
+      bru.setVar("refreshToken", data.data.refreshToken);
+    }
+  }
+}
+
+docs {
+  # Refresh Token
+
+  ## Request
+  - **URL**: POST {{baseUrl}}/user/refresh
+  - **Body**:
+    - `refreshToken`: Refresh token từ lần đăng nhập trước
+
+  ## Response (Success - 200)
+  ```json
+  {
+    "code": 200,
+    "data": {
+      "accessToken": "...",
+      "refreshToken": "..."
+    }
+  }
+  ```
+
+  ## Response (Error - 401)
+  ```json
+  {
+    "code": 401,
+    "message": "Refresh token không hợp lệ hoặc đã hết hạn"
+  }
+  ```
+}

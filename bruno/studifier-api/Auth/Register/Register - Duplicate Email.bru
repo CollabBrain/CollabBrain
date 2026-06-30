@@ -1,0 +1,40 @@
+meta {
+  name: Register - Duplicate Email
+  type: http
+  seq: 2
+}
+
+post {
+  url: {{baseUrl}}/user/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": {{email}},
+    "password": {{password}},
+    "username": "testuser2"
+  }
+}
+
+docs {
+  # Register - Duplicate Email
+
+  ## Test Case: UC02-Register-003 - Đăng ký với email đã tồn tại
+
+  ### Request
+  - **URL**: POST {{baseUrl}}/user/register
+  - **Body**:
+    - `email`: Email đã được đăng ký
+    - `password`: Mật khẩu mới
+    - `username`: Tên người dùng mới
+
+  ### Expected Response (400)
+  ```json
+  {
+    "code": 400,
+    "message": "Email đã được sử dụng"
+  }
+  ```
+}

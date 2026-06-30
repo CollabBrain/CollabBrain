@@ -1,0 +1,49 @@
+meta {
+  name: Verify OTP - Register
+  type: http
+  seq: 4
+}
+
+post {
+  url: {{baseUrl}}/user/register/verify-otp
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": {{email}},
+    "otp": "123456"
+  }
+}
+
+docs {
+  # Verify OTP - Register
+
+  ## Request
+  - **URL**: POST {{baseUrl}}/user/register/verify-otp
+  - **Body**:
+    - `email`: Email đã đăng ký
+    - `otp`: Mã OTP 6 số (xem trong email hoặc console log)
+
+  ## Response (Success - 200)
+  ```json
+  {
+    "code": 200,
+    "message": "Xác thực OTP thành công",
+    "data": {
+      "accessToken": "...",
+      "refreshToken": "...",
+      "user": { ... }
+    }
+  }
+  ```
+
+  ## Response (Error - 400)
+  ```json
+  {
+    "code": 400,
+    "message": "Mã OTP không chính xác hoặc đã hết hạn"
+  }
+  ```
+}

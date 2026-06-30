@@ -1,0 +1,40 @@
+meta {
+  name: Register - Invalid Email
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/user/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "invalid-email",
+    "password": {{password}},
+    "username": "testuser"
+  }
+}
+
+docs {
+  # Register - Invalid Email
+
+  ## Test Case: UC02-Register-004 - Đăng ký với email không hợp lệ
+
+  ### Request
+  - **URL**: POST {{baseUrl}}/user/register
+  - **Body**:
+    - `email`: Email không hợp lệ
+    - `password`: Mật khẩu mới
+    - `username`: Tên người dùng
+
+  ### Expected Response (400)
+  ```json
+  {
+    "code": 400,
+    "message": "Email không hợp lệ"
+  }
+  ```
+}

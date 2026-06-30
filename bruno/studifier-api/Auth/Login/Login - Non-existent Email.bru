@@ -1,0 +1,38 @@
+meta {
+  name: Login with Non-existent Email
+  type: http
+  seq: 3
+}
+
+post {
+  url: {{baseUrl}}/user/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": "nonexistent@example.com",
+    "password": "AnyPassword123!"
+  }
+}
+
+docs {
+  # Login with Non-existent Email
+
+  ## Test Case: UC01-Login-004 - Đăng nhập với email không tồn tại
+
+  ### Request
+  - **URL**: POST {{baseUrl}}/user/login
+  - **Body**:
+    - `email`: Email không tồn tại trong hệ thống
+    - `password`: Bất kỳ mật khẩu nào
+
+  ### Expected Response (400)
+  ```json
+  {
+    "code": 400,
+    "message": "Email hoặc mật khẩu không đúng"
+  }
+  ```
+}

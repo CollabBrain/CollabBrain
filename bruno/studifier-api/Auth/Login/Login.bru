@@ -1,0 +1,61 @@
+meta {
+  name: Login
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/user/login
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": {{email}},
+    "password": {{password}}
+  }
+}
+
+script:post-response {
+  if (res.status === 200) {
+    var data = res.getBody();
+    if (data.data && data.data.accessToken) {
+      bru.setVar("accessToken", data.data.accessToken);
+    }
+    if (data.data && data.data.refreshToken) {
+      bru.setVar("refreshToken", data.data.refreshToken);
+    }
+  }
+}
+
+docs {
+  # Login
+
+  ## Request
+  - **URL**: POST {{baseUrl}}/user/login
+  - **Body**:
+    - `email`: Email của người dùng
+    - `password`: Mật khẩu
+
+  ## Response (Success - 200)
+  ```json
+  {
+    "code": 200,
+    "message": "Đăng nhập thành công",
+    "data": {
+      "accessToken": "...",
+      "refreshToken": "...",
+      "user": { ... }
+    }
+  }
+  ```
+
+  ## Response (Error - 400)
+  ```json
+  {
+    "code": 400,
+    "message": "Email hoặc mật khẩu không đúng"
+  }
+  ```
+}

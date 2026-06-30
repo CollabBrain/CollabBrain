@@ -1,0 +1,49 @@
+meta {
+  name: Register
+  type: http
+  seq: 1
+}
+
+post {
+  url: {{baseUrl}}/user/register
+  body: json
+  auth: none
+}
+
+body:json {
+  {
+    "email": {{email}},
+    "password": {{password}},
+    "username": "testuser"
+  }
+}
+
+docs {
+  # Register
+
+  ## Request
+  - **URL**: POST {{baseUrl}}/user/register
+  - **Body**:
+    - `email`: Email mới chưa đăng ký
+    - `password`: Mật khẩu mới
+    - `username`: Tên người dùng
+
+  ## Response (Success - 201)
+  ```json
+  {
+    "code": 201,
+    "message": "Đăng ký thành công. Vui lòng xác thực OTP.",
+    "data": {
+      "email": "..."
+    }
+  }
+  ```
+
+  ## Response (Error - 400)
+  ```json
+  {
+    "code": 400,
+    "message": "Email đã được sử dụng"
+  }
+  ```
+}

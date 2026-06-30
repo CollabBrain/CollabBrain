@@ -1,0 +1,45 @@
+meta {
+  name: Get Profile
+  type: http
+  seq: 2
+}
+
+get {
+  url: {{baseUrl}}/user/profile
+  body: none
+  auth: bearer
+}
+
+auth:bearer {
+  token: {{accessToken}}
+}
+
+docs {
+  # Get Profile
+
+  ## Request
+  - **URL**: GET {{baseUrl}}/user/profile
+  - **Auth**: Bearer Token (accessToken)
+
+  ## Response (Success - 200)
+  ```json
+  {
+    "code": 200,
+    "data": {
+      "id": "...",
+      "email": "...",
+      "username": "...",
+      "avatar": "...",
+      "status": "..."
+    }
+  }
+  ```
+
+  ## Response (Error - 401)
+  ```json
+  {
+    "code": 401,
+    "message": "Không có quyền truy cập"
+  }
+  ```
+}
