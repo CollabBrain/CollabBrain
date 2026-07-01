@@ -338,6 +338,7 @@ export const useChatSocket = () => {
 
   const handleNewMessage = useCallback(
     ({ message }: SocketNewMessage) => {
+      console.log('[Socket useChatSocket] Received message:', message.id, 'content:', message.content);
       addMessage(message);
       const conv = conversationsRef.current.find((c) => c.id === message.conversationId);
       if (conv) {
@@ -349,18 +350,22 @@ export const useChatSocket = () => {
           } catch {}
         }
         const isFromMe = message.senderId === myId;
+        const newUnread = isFromMe ? conv.unreadCount : conv.unreadCount + 1;
+        console.log('[Socket useChatSocket] Updating conversation unreadCount to:', newUnread);
         addOrUpdate({
           ...conv,
           lastMessage: message,
           updatedAt: message.createdAt,
-          unreadCount: isFromMe ? conv.unreadCount : conv.unreadCount + 1,
+          unreadCount: newUnread,
         });
       } else {
+        console.log('[Socket useChatSocket] Conversation not found in store, invalidating query');
         queryClient.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
       }
     },
     [addMessage, addOrUpdate, accessToken, queryClient]
   );
+
 
   const handleTyping = useCallback(
     ({ conversationId, userId, isTyping }: SocketTypingEvent) => {

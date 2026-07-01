@@ -3,12 +3,15 @@ import { useTodos, useUpdateTodo } from "../hooks/useTodos";
 import type { TodoItem } from "../hooks/useTodos";
 import { Bell, Calendar, Check, X, AlertCircle, MessageCircle } from "lucide-react";
 import { useNotificationSettings } from "../hooks/useNotificationSettings";
+import { useNotifications, useMarkNotificationRead } from "../hooks/useNotifications";
 import { cn } from "../lib/utils";
 
 export const NotificationBell = () => {
   const { data: todos = [] } = useTodos();
+  const { data: systemNotifs = [] } = useNotifications();
   const { data: notifSettings } = useNotificationSettings();
   const updateTodoMutation = useUpdateTodo();
+  const markReadMutation = useMarkNotificationRead();
 
   const [upcomingTasks, setUpcomingTasks] = useState<TodoItem[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -233,6 +236,8 @@ export const NotificationBell = () => {
     }
   };
 
+  const totalUnreadCount = upcomingTasks.length + systemNotifs.length;
+
   return (
     <div className="relative" ref={popoverRef}>
       {/* Bell Trigger Button */}
@@ -241,17 +246,17 @@ export const NotificationBell = () => {
         className={`p-2 rounded-lg transition-colors cursor-pointer border-0 bg-transparent outline-none relative ${
           !isNotifEnabled
             ? 'text-slate-300'
-            : upcomingTasks.length > 0
-            ? 'text-amber-600 hover:bg-amber-50 animate-wiggle'
+            : totalUnreadCount > 0
+            ? 'text-rose-600 hover:bg-rose-50 animate-wiggle'
             : 'text-slate-400 hover:text-indigo-600 hover:bg-slate-50'
         }`}
-        title={!isNotifEnabled ? "Thông báo đã tắt" : "Thông báo lịch học"}
+        title={!isNotifEnabled ? "Thông báo đã tắt" : "Thông báo & Lịch học"}
       >
-        <Bell className={`w-5 h-5 ${upcomingTasks.length > 0 ? "animate-wiggle" : ""}`} />
+        <Bell className={`w-5 h-5 ${totalUnreadCount > 0 ? "animate-wiggle" : ""}`} />
 
-        {isNotifEnabled && upcomingTasks.length > 0 && (
+        {isNotifEnabled && totalUnreadCount > 0 && (
           <span className="absolute top-1.5 right-1.5 h-4 min-w-4 px-1 rounded-full bg-rose-600 text-white text-[9px] font-black flex items-center justify-center border border-white leading-none scale-100 select-none animate-pulse">
-            {upcomingTasks.length}
+            {totalUnreadCount}
           </span>
         )}
         {!isNotifEnabled && (
@@ -265,21 +270,53 @@ export const NotificationBell = () => {
           <div className="flex items-center justify-between pb-2.5 border-b border-slate-50 mb-3">
             <span className="text-xs font-black text-slate-700 flex items-center gap-1.5">
               <Calendar className="w-4 h-4 text-indigo-600" />
-              Lịch học sắp diễn ra
+              Thông báo & Lịch học
             </span>
-            {upcomingTasks.length > 0 && (
+            {totalUnreadCount > 0 && (
               <span className="px-2 py-0.5 text-[9px] font-black text-rose-600 bg-rose-50 rounded-lg">
-                Sắp tới
+                Mới
               </span>
             )}
           </div>
 
-          {upcomingTasks.length === 0 ? (
+          {upcomingTasks.length === 0 && systemNotifs.length === 0 ? (
             <p className="text-[10px] text-slate-400 font-bold py-6 text-center">
-              Không có lịch học nào sắp diễn ra trong 15 phút tới
+              Không có thông báo hoặc lịch học nào mới
             </p>
           ) : (
             <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
+              {/* Cảnh báo hệ thống (System Warning Notifications) */}
+              {systemNotifs.map((notif) => (
+                <div
+                  key={notif.id}
+                  className="p-3 bg-rose-50/70 border border-rose-100 rounded-2xl flex items-center justify-between gap-3 hover:bg-rose-100/50 transition-colors"
+                >
+                  <div className="min-w-0 text-left">
+                    <p className="text-xs font-bold text-rose-800 leading-snug">
+                      {notif.title}
+                    </p>
+                    <p className="text-[10px] text-slate-650 font-bold mt-1 leading-normal">
+                      {notif.content}
+                    </p>
+                  </div>
+
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      try {
+                        await markReadMutation.mutateAsync(notif.id);
+                      } catch {}
+                    }}
+                    disabled={markReadMutation.isPending}
+                    className="h-7 w-7 rounded-full bg-rose-100 hover:bg-rose-600 text-rose-600 hover:text-white flex items-center justify-center transition-colors border-0 outline-none cursor-pointer disabled:opacity-50 shadow-sm shrink-0"
+                    title="Đánh dấu đã đọc"
+                  >
+                    <Check className="w-4 h-4 stroke-[3.5]" />
+                  </button>
+                </div>
+              ))}
+
+              {/* Lịch học sắp tới (Upcoming Tasks) */}
               {upcomingTasks.map((todo) => {
                 const now = new Date();
                 const dueTime = new Date(todo.dueDate!).getTime();
@@ -340,7 +377,7 @@ export const NotificationBell = () => {
                       : toast.type === 'group' 
                       ? 'Thông báo nhóm' 
                       : toast.type === 'error'
-                      ? 'Gặp sự cố'
+                      ? 'Cảnh báo hệ thống'
                       : 'Lịch học sắp diễn ra'}
                   </h4>
                   <p className="text-[15px] font-[100] text-slate-800 dark:text-white leading-tight truncate mb-0.5">

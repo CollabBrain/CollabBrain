@@ -44,3 +44,50 @@ export const updateNotificationSettings = async (req: Request, res: Response) =>
     });
   }
 };
+
+export const getUserNotifications = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    if (!userId) {
+      return res.status(401).json({ code: 401, message: "Unauthorized" });
+    }
+
+    const notifications = await notificationRepo.getNotifications(userId);
+
+    res.status(200).json({
+      code: 200,
+      message: "Lấy danh sách thông báo thành công",
+      data: notifications
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      code: 400,
+      message: error.message || "Lỗi khi lấy danh sách thông báo"
+    });
+  }
+};
+
+export const markRead = async (req: Request, res: Response) => {
+  try {
+    const userId = (req as any).user?.id;
+    const id = req.params.id as string;
+
+    if (!userId) {
+      return res.status(401).json({ code: 401, message: "Unauthorized" });
+    }
+
+    const notification = await notificationRepo.markAsRead(id, userId);
+
+    res.status(200).json({
+      code: 200,
+      message: "Đánh dấu thông báo đã đọc thành công",
+      data: notification
+    });
+  } catch (error: any) {
+    res.status(400).json({
+      code: 400,
+      message: error.message || "Lỗi khi cập nhật trạng thái thông báo"
+    });
+  }
+};
+

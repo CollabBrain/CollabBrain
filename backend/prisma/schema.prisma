@@ -51,6 +51,7 @@ model User {
   reviews            Review[]
   todos              Todo[]
   notificationSettings UserNotificationSettings?
+  notifications      Notification[]
   @@map("users")
 }
 
@@ -222,6 +223,22 @@ model Report {
   targetUser      User?        @relation("ReportedUser", fields: [targetUserId], references: [id], onDelete: Cascade)
 
   @@map("reports")
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  title     String
+  content   String
+  isRead    Boolean  @default(false) @map("is_read")
+  type      String   @default("system") // "system", "chat", "friend", "group"
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@map("notifications")
 }
 
 model SiteSetting {

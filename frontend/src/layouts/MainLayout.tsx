@@ -308,6 +308,7 @@ const MainLayout = () => {
     };
 
     const handleChatNewMessage = ({ message }: { message: any }) => {
+      console.log('[Socket MainLayout] Received message:', message.id, 'content:', message.content);
       const pathMatch = window.location.pathname.match(/^\/chat\/([^/]+)/);
       const activeConvId = pathMatch ? pathMatch[1] : null;
 
@@ -319,20 +320,6 @@ const MainLayout = () => {
 
       const isFromMe = message.senderId === myId;
       if (message.conversationId !== activeConvId && !isFromMe) {
-        // Sync Zustand store
-        const state = useChatStore.getState();
-        const conv = state.conversations.find((c) => c.id === message.conversationId);
-        if (conv) {
-          state.addOrUpdateConversation({
-            ...conv,
-            lastMessage: message,
-            updatedAt: message.createdAt,
-            unreadCount: conv.unreadCount + 1,
-          });
-        } else {
-          queryClient.invalidateQueries({ queryKey: ['chat', 'conversations'] });
-        }
-
         // Trigger notification
         if (isNotifEnabled && isChatEnabled) {
           const senderName = message.sender?.name || 'Tin nhắn riêng';
@@ -350,12 +337,26 @@ const MainLayout = () => {
       }
     };
 
+    const handleNewSystemNotification = (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      if (isNotifEnabled) {
+        window.dispatchEvent(new CustomEvent('app-notification', {
+          detail: {
+            title: data.title || 'Cảnh báo hệ thống',
+            message: data.content || 'Bạn nhận được cảnh báo vi phạm mới.',
+            type: 'error'
+          }
+        }));
+      }
+    };
+
     socket.on('new_request_friend', handleNewFriendRequest);
     socket.on('accept_friend_request', handleAcceptFriendRequest);
     socket.on('new_group_invitation', handleNewGroupInvitation);
     socket.on('new_group_join_request', handleNewGroupJoinRequest);
     socket.on('group:new_message', handleGroupNewMessage);
     socket.on('chat:new_message', handleChatNewMessage);
+    socket.on('notification:new', handleNewSystemNotification);
 
     return () => {
       socket.off('new_request_friend', handleNewFriendRequest);
@@ -364,8 +365,9 @@ const MainLayout = () => {
       socket.off('new_group_join_request', handleNewGroupJoinRequest);
       socket.off('group:new_message', handleGroupNewMessage);
       socket.off('chat:new_message', handleChatNewMessage);
+      socket.off('notification:new', handleNewSystemNotification);
     };
-  }, [accessToken, queryClient]);
+  }, [accessToken, queryClient, isNotifEnabled, isChatEnabled, isFriendEnabled, isGroupEnabled]);
 
   // ——— Lắng nghe cuộc gọi đến từ bất kỳ trang nào ———
   useEffect(() => {
