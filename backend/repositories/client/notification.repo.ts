@@ -35,3 +35,39 @@ export const updateNotificationSettings = async (
     create: { userId, ...data }
   });
 };
+
+export const createNotification = async (userId: string, title: string, content: string, type: string = "system") => {
+  return prisma.notification.create({
+    data: {
+      userId,
+      title,
+      content,
+      type
+    }
+  });
+};
+
+export const getNotifications = async (userId: string) => {
+  return prisma.notification.findMany({
+    where: {
+      userId,
+      isRead: false
+    },
+    orderBy: {
+      createdAt: "desc"
+    }
+  });
+};
+
+export const markAsRead = async (id: string, userId: string) => {
+  return prisma.notification.update({
+    where: {
+      id,
+      userId
+    },
+    data: {
+      isRead: true
+    }
+  });
+};
+

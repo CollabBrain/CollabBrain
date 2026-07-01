@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import * as reportRepo from "../../repositories/admin/report.repo";
+import { createNotification } from "../../repositories/client/notification.repo";
 import { ReportStatus } from "@prisma/client";
 
 export const getReports = async (req: Request, res: Response) => {
@@ -40,6 +41,31 @@ export const resolveReport = async (req: Request, res: Response) => {
     }
 
     const result = await reportRepo.updateReportStatus(id, status as ReportStatus, resolutionNotes);
+
+    // If resolved and has a target user, create warning notification & push via socket
+    if (status === ReportStatus.RESOLVED && result.targetUserId) {
+      const notifTitle = "Cảnh báo vi phạm";
+      const notifContent = resolutionNotes || "Tài khoản của bạn nhận được cảnh báo vi phạm chuẩn mực cộng đồng.";
+      
+      const newNotif = await createNotification(
+        result.targetUserId,
+        notifTitle,
+        notifContent,
+        "system"
+      );
+
+      const io = req.app.get("io");
+      if (io) {
+        io.to(result.targetUserId).emit("notification:new", {
+          id: newNotif.id,
+          title: newNotif.title,
+          content: newNotif.content,
+          type: newNotif.type,
+          createdAt: newNotif.createdAt,
+          isRead: newNotif.isRead
+        });
+      }
+    }
 
     res.status(200).json({
       success: true,

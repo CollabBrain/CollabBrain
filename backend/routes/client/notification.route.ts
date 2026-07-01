@@ -7,5 +7,7 @@ router.use(authMiddleware.authMiddleware);
 
 router.get("/", controller.getNotificationSettings);
 router.put("/", controller.updateNotificationSettings);
+router.get("/list", controller.getUserNotifications);
+router.patch("/:id/read", controller.markRead);
 
 export const notificationRoutes = router;
