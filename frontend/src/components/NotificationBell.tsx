@@ -3,6 +3,7 @@ import { useTodos, useUpdateTodo } from "../hooks/useTodos";
 import type { TodoItem } from "../hooks/useTodos";
 import { Bell, Calendar, Check, X, AlertCircle, MessageCircle } from "lucide-react";
 import { useNotificationSettings } from "../hooks/useNotificationSettings";
+import { cn } from "../lib/utils";
 
 export const NotificationBell = () => {
   const { data: todos = [] } = useTodos();
@@ -14,18 +15,37 @@ export const NotificationBell = () => {
 
   // Track tasks that have already triggered a Toast alert in the current session
   const notifiedIdsRef = useRef<Set<string>>(new Set());
-  const [toasts, setToasts] = useState<Array<{ id: string; title: string; timeStr: string; type: 'todo' | 'chat' }>>([]);
+  const [toasts, setToasts] = useState<Array<{ id: string; title: string; timeStr: string; type: 'todo' | 'chat' | 'friend' | 'group' | 'error' }>>([]);
 
   const popoverRef = useRef<HTMLDivElement>(null);
 
   // Get notification enabled state
   const isNotifEnabled = notifSettings?.enableAll !== false;
   const isChatEnabled = notifSettings?.enableChat !== false;
+  const isFriendEnabled = notifSettings?.enableFriend !== false;
+  const isGroupEnabled = notifSettings?.enableGroup !== false;
   const chatPriority = notifSettings?.chatPriority || 'HIGH';
 
   // Check if chat notifications should be prominent
   const isChatHighPriority = chatPriority === 'HIGH';
   const isChatMediumPriority = chatPriority === 'MEDIUM';
+
+
+  // Inject keyframe style for progress bar
+  useEffect(() => {
+    const styleId = 'toast-progress-style';
+    if (!document.getElementById(styleId)) {
+      const style = document.createElement('style');
+      style.id = styleId;
+      style.textContent = `
+        @keyframes toast-progress {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+      `;
+      document.head.appendChild(style);
+    }
+  }, []);
 
   // Close popover when clicking outside
   useEffect(() => {
@@ -110,20 +130,28 @@ export const NotificationBell = () => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
   };
 
-  // Function to add chat message toast (called from outside)
+  // Listen for custom app notification events (chat, friend, group)
   useEffect(() => {
-    // Listen for custom chat notification events
-    const handleChatNotification = (event: CustomEvent<{ senderName: string; content: string; conversationName: string }>) => {
-      if (!isNotifEnabled || !isChatEnabled) return;
+    interface AppNotificationDetail {
+      title: string;
+      message: string;
+      type: 'chat' | 'friend' | 'group';
+    }
 
-      const toastId = `chat-${Date.now()}`;
-      const { senderName, content, conversationName } = event.detail;
+    const handleAppNotification = (event: CustomEvent<AppNotificationDetail>) => {
+      const { title, message, type } = event.detail;
 
+      if (!isNotifEnabled) return;
+      if (type === 'chat' && !isChatEnabled) return;
+      if (type === 'friend' && !isFriendEnabled) return;
+      if (type === 'group' && !isGroupEnabled) return;
+
+      const toastId = `${type}-${Date.now()}`;
       const newToast = {
         id: toastId,
-        title: senderName,
-        timeStr: content.length > 50 ? content.slice(0, 50) + '...' : content,
-        type: 'chat' as const
+        title,
+        timeStr: message,
+        type
       };
 
       setToasts((prev) => [...prev, newToast]);
@@ -148,20 +176,62 @@ export const NotificationBell = () => {
       }
     };
 
-    window.addEventListener('chat-notification', handleChatNotification as EventListener);
-    return () => window.removeEventListener('chat-notification', handleChatNotification as EventListener);
-  }, [isNotifEnabled, isChatEnabled, notifSettings?.enableSound, notifSettings?.enableVibrate]);
+    window.addEventListener('app-notification', handleAppNotification as EventListener);
+    return () => window.removeEventListener('app-notification', handleAppNotification as EventListener);
+  }, [isNotifEnabled, isChatEnabled, isFriendEnabled, isGroupEnabled, notifSettings?.enableSound, notifSettings?.enableVibrate]);
 
-  // Sort toasts: chat HIGH priority first, then MEDIUM, then LOW, then todo
+  // Sort toasts: social alerts first, then todo
   const sortedToasts = [...toasts].sort((a, b) => {
-    if (a.type === 'chat' && b.type === 'todo') return -1;
-    if (a.type === 'todo' && b.type === 'chat') return 1;
+    const isSocialA = ['chat', 'friend', 'group'].includes(a.type);
+    const isSocialB = ['chat', 'friend', 'group'].includes(b.type);
+    if (isSocialA && b.type === 'todo') return -1;
+    if (a.type === 'todo' && isSocialB) return 1;
     if (a.type === 'chat' && b.type === 'chat') {
       if (isChatHighPriority) return -1;
       if (isChatMediumPriority && a.id > b.id) return -1;
     }
     return 0;
   });
+
+  const getToastStyles = (type: string) => {
+    switch (type) {
+      case 'chat':
+        return {
+          iconBg: 'bg-blue-500 text-white',
+          titleColor: 'text-slate-900 dark:text-white',
+          progressBarBg: 'bg-blue-50 dark:bg-blue-950/20',
+          progressBarActive: 'bg-blue-500',
+        };
+      case 'friend':
+        return {
+          iconBg: 'bg-emerald-500 text-white',
+          titleColor: 'text-slate-900 dark:text-white',
+          progressBarBg: 'bg-emerald-50 dark:bg-emerald-950/20',
+          progressBarActive: 'bg-emerald-500',
+        };
+      case 'group':
+        return {
+          iconBg: 'bg-purple-500 text-white',
+          titleColor: 'text-slate-900 dark:text-white',
+          progressBarBg: 'bg-purple-50 dark:bg-purple-950/20',
+          progressBarActive: 'bg-purple-500',
+        };
+      case 'error':
+        return {
+          iconBg: 'bg-rose-500 text-white',
+          titleColor: 'text-slate-900 dark:text-white',
+          progressBarBg: 'bg-rose-50 dark:bg-rose-950/20',
+          progressBarActive: 'bg-rose-500',
+        };
+      default: // todo / default
+        return {
+          iconBg: 'bg-amber-500 text-white',
+          titleColor: 'text-slate-900 dark:text-white',
+          progressBarBg: 'bg-amber-50 dark:bg-amber-950/20',
+          progressBarActive: 'bg-amber-500',
+        };
+    }
+  };
 
   return (
     <div className="relative" ref={popoverRef}>
@@ -253,86 +323,53 @@ export const NotificationBell = () => {
       {/* Floating Toast Alerts Container */}
       {sortedToasts.length > 0 && (
         <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 max-w-sm pointer-events-auto">
-          {sortedToasts.map((toast) => (
-            <div
-              key={toast.id}
-              className={[
-                'rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop-blur-md flex items-start gap-3.5 animate-in slide-in-from-right duration-350 select-none relative overflow-hidden group',
-                // Priority styling for chat messages
-                toast.type === 'chat' && isChatHighPriority
-                  ? 'bg-rose-600/95 border border-rose-500 text-white p-4.5'
-                  : toast.type === 'chat' && isChatMediumPriority
-                  ? 'bg-amber-500/95 border border-amber-400 text-white p-4.5'
-                  : toast.type === 'chat'
-                  ? 'bg-slate-800/95 border border-slate-700 text-white p-4.5'
-                  : 'bg-slate-900/95 border border-slate-800 text-white p-4.5'
-              ].join(' ')}
-            >
-              {/* Left Icon */}
-              <div className={[
-                'w-9 h-9 rounded-xl flex items-center justify-center shrink-0',
-                toast.type === 'chat' && isChatHighPriority
-                  ? 'bg-white/20 text-white'
-                  : toast.type === 'chat' && isChatMediumPriority
-                  ? 'bg-white/20 text-white'
-                  : toast.type === 'chat'
-                  ? 'bg-white/20 text-white'
-                  : 'bg-amber-500/10 text-amber-500'
-              ].join(' ')}>
-                {toast.type === 'chat' ? (
-                  <MessageCircle className="w-5 h-5 animate-pulse" />
-                ) : (
-                  <AlertCircle className="w-5 h-5 animate-pulse" />
-                )}
-              </div>
+          {sortedToasts.map((toast) => {
+            const styles = getToastStyles(toast.type);
+            return (
+              <div
+                key={toast.id}
+                className="w-[360px] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 rounded-xl shadow-[0_12px_32px_rgba(0,0,0,0.06)] flex items-stretch select-none relative overflow-hidden animate-in slide-in-from-right duration-300"
+              >
+                {/* Content Panel */}
+                <div className="flex-1 flex flex-col justify-center pl-5 pr-9 py-5 text-left min-w-0">
+                  <h4 className={cn("text-[10px] font-black uppercase tracking-widest leading-none mb-1.5", styles.titleColor)}>
+                    {toast.type === 'chat' 
+                      ? 'Tin nhắn mới' 
+                      : toast.type === 'friend' 
+                      ? 'Lời mời kết bạn' 
+                      : toast.type === 'group' 
+                      ? 'Thông báo nhóm' 
+                      : toast.type === 'error'
+                      ? 'Gặp sự cố'
+                      : 'Lịch học sắp diễn ra'}
+                  </h4>
+                  <p className="text-[15px] font-[100] text-slate-800 dark:text-white leading-tight truncate mb-0.5">
+                    {toast.title}
+                  </p>
+                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 leading-snug line-clamp-2 pr-1">
+                    {toast.timeStr}
+                  </p>
+                </div>
 
-              {/* Text content */}
-              <div className="flex-1 min-w-0 text-left space-y-1">
-                <p className={[
-                  'text-xs font-black uppercase tracking-widest leading-none',
-                  toast.type === 'chat' && isChatHighPriority
-                    ? 'text-rose-200'
-                    : toast.type === 'chat'
-                    ? 'text-amber-200'
-                    : 'text-slate-150'
-                ].join(' ')}>
-                  {toast.type === 'chat' ? 'Tin nhắn mới' : 'Lịch học sắp diễn ra'}
-                </p>
-                <p className="text-sm font-bold text-white truncate leading-snug">{toast.title}</p>
-                <p className={[
-                  'text-[10px] font-extrabold capitalize',
-                  toast.type === 'chat' && isChatHighPriority
-                    ? 'text-rose-200'
-                    : toast.type === 'chat'
-                    ? 'text-amber-200'
-                    : 'text-amber-400'
-                ].join(' ')}>
-                  {toast.timeStr}
-                </p>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="flex items-center gap-1.5 shrink-0 self-center">
-                {toast.type === 'todo' && (
-                  <button
-                    onClick={(e) => handleQuickComplete(toast.id, e)}
-                    disabled={updateTodoMutation.isPending}
-                    className="h-7 w-7 rounded-lg bg-indigo-650 hover:bg-indigo-650/80 text-white flex items-center justify-center border-0 outline-none cursor-pointer transition-colors shadow-sm"
-                    title="Hoàn thành nhanh"
-                  >
-                    <Check className="w-3.5 h-3.5 stroke-[3.5]" />
-                  </button>
-                )}
+                {/* Top-right Dismiss Button */}
                 <button
                   onClick={() => removeToast(toast.id)}
-                  className="h-7 w-7 rounded-lg bg-slate-800 hover:bg-slate-750 text-slate-400 hover:text-white flex items-center justify-center border-0 outline-none cursor-pointer transition-colors"
-                  title="Đóng thông báo"
+                  className="absolute top-2.5 right-2.5 h-5 w-5 rounded hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 flex items-center justify-center border-0 outline-none cursor-pointer transition-colors"
+                  title="Đóng"
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
+
+                {/* Bottom animated Progress Bar */}
+                <div className={cn("absolute bottom-0 left-0 right-0 h-[3px] w-full", styles.progressBarBg)}>
+                  <div
+                    className={cn("h-full w-full", styles.progressBarActive)}
+                    style={{ animation: 'toast-progress 5000ms linear forwards' }}
+                  />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -353,5 +390,52 @@ const ClockIcon = ({ className }: { className?: string }) => (
   >
     <circle cx="12" cy="12" r="10" />
     <polyline points="12 6 12 12 16 14" />
+  </svg>
+);
+
+// Chat Icon SVG
+const ChatIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+  </svg>
+);
+
+// Happy Face SVG (Success alert in friend requests/accepts)
+const SuccessIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+    <line x1="9" y1="9" x2="9.01" y2="9" />
+    <line x1="15" y1="9" x2="15.01" y2="9" />
+  </svg>
+);
+
+// Sad Face SVG (System errors / Warn alerts)
+const SadIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10" />
+    <path d="M16 16s-1.5-2-4-2-4 2-4 2" />
+    <line x1="9" y1="9" x2="9.01" y2="9" />
+    <line x1="15" y1="9" x2="15.01" y2="9" />
+  </svg>
+);
+
+// Group Icon SVG (Group invites / announcements)
+const GroupIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+    <circle cx="9" cy="7" r="4" />
+    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+  </svg>
+);
+
+// Todo Icon SVG (Calendar/Todo items checklist)
+const TodoIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+    <line x1="16" y1="2" x2="16" y2="6" />
+    <line x1="8" y1="2" x2="8" y2="6" />
+    <line x1="3" y1="10" x2="21" y2="10" />
   </svg>
 );
