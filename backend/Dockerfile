@@ -8,8 +8,8 @@ RUN apk add --no-cache python3 make g++
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Cài đặt toàn bộ dependencies bao gồm cả devDependencies để compile TypeScript
-RUN npm ci
+# Cài đặt toàn bộ dependencies (Dùng npm install thay cho npm ci để tránh lỗi khi thiếu package-lock.json)
+RUN npm install
 
 # Sao chép toàn bộ source code
 COPY . .
@@ -25,8 +25,8 @@ ENV NODE_ENV=production
 COPY package*.json ./
 COPY prisma ./prisma/
 
-# Chỉ cài đặt dependencies cần thiết cho production (bỏ devDependencies)
-RUN npm ci --only=production
+# Chỉ cài đặt dependencies cần thiết cho production
+RUN npm install --omit=dev
 
 # Copy Prisma Client được sinh ra ở Stage 1
 COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
@@ -38,3 +38,4 @@ EXPOSE 3000
 
 # Khởi chạy: Thực hiện cập nhật database schema qua prisma db push và chạy server
 CMD ["sh", "-c", "npx prisma db push && node dist/index.js"]
+

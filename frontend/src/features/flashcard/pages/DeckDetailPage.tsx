@@ -101,8 +101,8 @@ export const DeckDetailPage = () => {
           getDeckByIdApi(deckId),
           getDeckCardsApi(deckId),
         ]);
-        if (deckRes.data.code === 200) setDeck(deckRes.data.data);
-        if (cardsRes.data.code === 200) {
+        if (deckRes.data.code === 200 && deckRes.data.data) setDeck(deckRes.data.data);
+        if (cardsRes.data.code === 200 && cardsRes.data.data) {
           setCards(cardsRes.data.data.cards);
         }
       } catch (error) {

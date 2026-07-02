@@ -135,7 +135,7 @@ export const DeckCard = ({
                   <MoreHorizontal className="w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
+              <DropdownMenuContent>
                 {cardCount > 0 && (
                   <DropdownMenuItem onClick={() => onStudy?.(deck.id)}>
                     <svg
