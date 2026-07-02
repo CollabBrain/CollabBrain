@@ -292,32 +292,31 @@ export const CallOverlay = () => {
       {/* ========================================================= */}
       {/* Video streams (chỉ hiện khi gọi video) */}
       {/* ========================================================= */}
-      {isVideoCall && (
-        <>
-          {/* Remote video — phóng to toàn màn hình */}
-          <video
-            ref={remoteVideoRef}
-            autoPlay
-            playsInline
-            className={cn(
-              'absolute inset-0 w-full h-full object-cover',
-              status !== 'connected' && 'hidden'
-            )}
-          />
+      {/* Thẻ video/audio của đối phương — luôn render để phát tiếng, ẩn đi nếu không phải gọi video hoặc chưa kết nối */}
+      <video
+        ref={remoteVideoRef}
+        autoPlay
+        playsInline
+        className={cn(
+          isVideoCall && status === 'connected'
+            ? 'absolute inset-0 w-full h-full object-cover z-0'
+            : 'absolute pointer-events-none opacity-0 w-px h-px'
+        )}
+      />
 
-          {/* Local video — thu nhỏ ở góc dưới phải */}
-          <video
-            ref={localVideoRef}
-            autoPlay
-            playsInline
-            muted // PHẢI mute local video để tránh echo
-            className={cn(
-              'absolute bottom-28 right-4 w-32 h-44 sm:w-40 sm:h-56 object-cover rounded-2xl border-2 border-white/20 shadow-2xl z-10 transition-all',
-              isCameraOff && 'hidden',
-              status !== 'connected' && 'hidden'
-            )}
-          />
-        </>
+      {/* Thẻ video của mình — chỉ render khi gọi video */}
+      {isVideoCall && (
+        <video
+          ref={localVideoRef}
+          autoPlay
+          playsInline
+          muted // PHẢI mute local video để tránh echo
+          className={cn(
+            'absolute bottom-28 right-4 w-32 h-44 sm:w-40 sm:h-56 object-cover rounded-2xl border-2 border-white/20 shadow-2xl z-10 transition-all',
+            isCameraOff && 'hidden',
+            status !== 'connected' && 'hidden'
+          )}
+        />
       )}
 
       {/* ========================================================= */}
