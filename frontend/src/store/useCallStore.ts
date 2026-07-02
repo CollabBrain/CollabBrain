@@ -70,7 +70,7 @@ export const useCallStore = create<CallState>((set, get) => ({
     set({ status: 'calling', callType, remoteUser, incomingCall: null }),
 
   setIncomingCall: (data) =>
-    set({ status: 'ringing', incomingCall: data }),
+    set({ status: 'ringing', incomingCall: data, callType: data ? data.callType : null }),
 
   setConnecting: () =>
     set({ status: 'connecting' }),

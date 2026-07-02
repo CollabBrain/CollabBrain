@@ -20,14 +20,17 @@ const getIceServersAsync = async (): Promise<RTCIceServer[]> => {
 
   try {
     const res = await axiosInstance.get('/chat/turn');
-    const { url, username, credential } = res.data.data;
+    const { url, username, credential, iceServers } = res.data.data;
 
-    if (url && username && credential) {
+    if (iceServers && Array.isArray(iceServers) && iceServers.length > 0) {
+      servers.push(...iceServers);
+      console.log('[WebRTC] Dynamic iceServers configured from Xirsys API');
+    } else if (url && username && credential) {
       servers.push(
         { urls: `turn:${url}`, username, credential },
         { urls: `turns:${url}`, username, credential }
       );
-      console.log('[WebRTC] TURN server configured from Backend API');
+      console.log('[WebRTC] Static TURN server configured from Backend API');
     } else {
       console.warn('[WebRTC] TURN server not configured on Backend.');
     }
