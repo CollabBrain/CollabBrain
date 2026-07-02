@@ -24,6 +24,7 @@ const ensureAIBotUser = async () => {
 
 export const chatSocket = (io: Server) => {
   const onlineUsers = new Map<string, string>()
+  const activeCalls = new Map<string, string>()
 
   ensureAIBotUser();
 
@@ -121,6 +122,8 @@ export const chatSocket = (io: Server) => {
      */
     socket.on("call:accept", ({ callerId }: { callerId: string }) => {
       console.log(`[Call] ${user.id} accepted call from ${callerId}`)
+      activeCalls.set(user.id, callerId)
+      activeCalls.set(callerId, user.id)
       io.to(callerId).emit("call:accepted", { calleeId: user.id })
     })
 
@@ -179,6 +182,8 @@ export const chatSocket = (io: Server) => {
      */
     socket.on("call:end", ({ targetUserId }: { targetUserId: string }) => {
       console.log(`[Call] ${user.id} ended call with ${targetUserId}`)
+      activeCalls.delete(user.id)
+      activeCalls.delete(targetUserId)
       io.to(targetUserId).emit("call:ended", { byUserId: user.id })
     })
 
@@ -440,6 +445,16 @@ export const chatSocket = (io: Server) => {
     socket.on("disconnect", () => {
       onlineUsers.delete(user.id)
       socket.broadcast.emit("user:online_status", { userId: user.id, isOnline: false })
+
+      // Sửa lỗi treo màn hình khi mất kết nối đột ngột
+      if (activeCalls.has(user.id)) {
+        const peerUserId = activeCalls.get(user.id)
+        if (peerUserId) {
+          io.to(peerUserId).emit("call:ended", { byUserId: user.id })
+          activeCalls.delete(peerUserId)
+        }
+        activeCalls.delete(user.id)
+      }
     })
   })
 }

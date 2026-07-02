@@ -1,4 +1,5 @@
 import { Request, Response } from "express";
+import axios from "axios";
 import { 
   deleteMessageService, 
   getChatHistoryService, 
@@ -796,16 +797,87 @@ export const uploadGroupChatFile = async (req: Request, res: Response) => {
 //[GET] /chat/turn — Lấy thông tin cấu hình TURN server
 export const getTurnCredentials = async (req: Request, res: Response) => {
   try {
+    const ident = process.env.XIRSYS_IDENT || '';
+    const secret = process.env.XIRSYS_SECRET || '';
+    const channel = process.env.XIRSYS_CHANNEL || '';
+
+    if (!ident || !secret || !channel) {
+      const url = process.env.TURN_URL || '';
+      const username = process.env.TURN_USERNAME || '';
+      const credential = process.env.TURN_CREDENTIAL || '';
+
+      return res.status(200).json({
+        code: 200,
+        message: "Lấy cấu hình TURN tĩnh thành công",
+        data: { url, username, credential }
+      });
+    }
+
+    const authHeader = Buffer.from(`${ident}:${secret}`).toString('base64');
+    const response = await axios({
+      method: 'PUT',
+      url: `https://global.xirsys.net/_turn/${channel}`,
+      headers: {
+        'Authorization': `Basic ${authHeader}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const xirsysData = response.data;
+    if (xirsysData && xirsysData.s === 'ok' && xirsysData.v && xirsysData.v.iceServers) {
+      const rawServers = xirsysData.v.iceServers;
+      
+      // Chuẩn hóa 'url' từ Xirsys thành 'urls' theo đặc tả RTCIceServer của trình duyệt
+      const iceServers = rawServers.map((server: any) => {
+        const urls = server.urls || server.url;
+        const mapped: any = { urls };
+        if (server.username) mapped.username = server.username;
+        if (server.credential) mapped.credential = server.credential;
+        return mapped;
+      });
+      
+      // Bóc tách server TURN đầu tiên để duy trì tương thích ngược với format cũ
+      let legacyUrl = '';
+      let legacyUsername = '';
+      let legacyCredential = '';
+
+      const firstTurn = iceServers.find((server: any) => 
+        Array.isArray(server.urls) 
+          ? server.urls.some((u: string) => u.startsWith('turn:'))
+          : typeof server.urls === 'string' && server.urls.startsWith('turn:')
+      );
+
+      if (firstTurn) {
+        const urlsArray = Array.isArray(firstTurn.urls) ? firstTurn.urls : [firstTurn.urls];
+        const turnUrl = urlsArray.find((u: string) => u.startsWith('turn:')) || '';
+        legacyUrl = turnUrl.replace(/^turns?:/, '').split('?')[0]; // bỏ tiền tố turns: và query params
+        legacyUsername = firstTurn.username;
+        legacyCredential = firstTurn.credential;
+      }
+
+      return res.status(200).json({
+        code: 200,
+        message: "Lấy cấu hình TURN động thành công",
+        data: {
+          url: legacyUrl,
+          username: legacyUsername,
+          credential: legacyCredential,
+          iceServers: iceServers
+        }
+      });
+    } else {
+      throw new Error('Xirsys API trả về trạng thái không hợp lệ: ' + JSON.stringify(xirsysData));
+    }
+  } catch (error: any) {
+    console.error("Lỗi khi fetch Xirsys TURN credentials:", error.message);
     const url = process.env.TURN_URL || '';
     const username = process.env.TURN_USERNAME || '';
     const credential = process.env.TURN_CREDENTIAL || '';
 
     return res.status(200).json({
       code: 200,
-      message: "Lấy cấu hình TURN thành công",
+      message: "Lấy cấu hình TURN tĩnh thành công (fallback)",
       data: { url, username, credential }
     });
-  } catch (error: any) {
-    return res.status(500).json({ code: 500, message: `Lỗi: ${error.message}` });
   }
 };
