@@ -112,6 +112,7 @@ export const CallOverlay = () => {
 
     // Caller nhận phản hồi: cuộc gọi bị từ chối
     const handleRejected = () => {
+      endCall('');
       reset();
     };
 

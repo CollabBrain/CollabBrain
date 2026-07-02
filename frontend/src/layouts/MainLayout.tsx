@@ -181,8 +181,12 @@ const MainLayout = () => {
     logout();
     window.location.replace(ROUTES.LOGIN);
   };
-
   const closeMobile = () => setIsMobileOpen(false);
+
+  // Khởi tạo socket đồng bộ trong pha render để các component con (CallOverlay) có socket khi mount
+  if (accessToken && !getSocket()) {
+    initSocket(accessToken);
+  }
 
   // Initialize and clean up socket connection globally
   useEffect(() => {
@@ -192,7 +196,6 @@ const MainLayout = () => {
       disconnectSocket();
     }
   }, [accessToken]);
-
   // Setup global chat socket listener
   useChatSocket();
   useConversations();
