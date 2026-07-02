@@ -235,9 +235,12 @@ export const useWebRTC = (): UseWebRTCReturn => {
     console.log('[WebRTC] Answering call from', callerId);
     cleanup();
 
-    // 1. Lấy local stream
-    const localStream = await getLocalStream(currentCallType);
-    setLocalStream(localStream);
+    // 1. Lấy local stream (Tái sử dụng nếu đã cấp quyền trước đó)
+    let localStream = useCallStore.getState().localStreamRef;
+    if (!localStream) {
+      localStream = await getLocalStream(currentCallType);
+      setLocalStream(localStream);
+    }
 
     if (localVideoRef.current) {
       localVideoRef.current.srcObject = localStream;

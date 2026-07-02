@@ -251,6 +251,12 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
   const handleStartCall = useCallback(async (callType: 'audio' | 'video') => {
     if (!other) return;
 
+    // Kiểm tra trình duyệt có hỗ trợ getUserMedia không (cần Secure Context)
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      alert('Trình duyệt không hỗ trợ truy cập Camera/Micro. Hãy đảm bảo bạn đang dùng HTTPS hoặc localhost.');
+      return;
+    }
+
     try {
       // Yêu cầu quyền Camera/Micro ngay lập tức tại event click để vượt rào Safari iOS
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -277,7 +283,24 @@ const ChatWindow = ({ conversation, currentUserId, onBackMobile }: ChatWindowPro
         });
       }
     } catch (err: any) {
-      alert(`Không thể gọi: ${err.message}. Vui lòng cấp quyền Camera/Micro.`);
+      console.error('[Call] getUserMedia error:', err.name, err.message);
+
+      if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
+        alert(
+          'Quyền Camera/Micro bị chặn!\n\n' +
+          'Cách cấp quyền:\n' +
+          '1. Click vào biểu tượng 🔒 trên thanh địa chỉ trình duyệt\n' +
+          '2. Tìm "Camera" và "Microphone"\n' +
+          '3. Chuyển sang "Allow" (Cho phép)\n' +
+          '4. Tải lại trang (F5) và thử gọi lại'
+        );
+      } else if (err.name === 'NotFoundError' || err.name === 'DevicesNotFoundError') {
+        alert('Không tìm thấy Camera hoặc Microphone. Vui lòng kiểm tra thiết bị đã được kết nối.');
+      } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
+        alert('Camera/Micro đang được sử dụng bởi ứng dụng khác. Vui lòng đóng ứng dụng đó và thử lại.');
+      } else {
+        alert(`Không thể truy cập Camera/Micro: ${err.message}`);
+      }
     }
   }, [other, startCall, myProfile]);
 
